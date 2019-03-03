@@ -31,6 +31,45 @@
         <operation>Formula</operation>
         <protected>false</protected>
     </fieldUpdates>
+    <fieldUpdates>
+        <fullName>Opportunity_Copy_FMV_to_Amount</fullName>
+        <description>Copy the Opportunities Fair Market Value field to the Amount field.</description>
+        <field>Amount</field>
+        <formula>Fair_Market_Value__c</formula>
+        <name>Opportunity Copy FMV to Amount</name>
+        <notifyAssignee>false</notifyAssignee>
+        <operation>Formula</operation>
+        <protected>false</protected>
+    </fieldUpdates>
+    <rules>
+        <fullName>Opportunity Copy FMV to Amount</fullName>
+        <actions>
+            <name>Opportunity_Copy_FMV_to_Amount</name>
+            <type>FieldUpdate</type>
+        </actions>
+        <active>false</active>
+        <booleanFilter>(1 OR 2) AND (3 AND 4)</booleanFilter>
+        <criteriaItems>
+            <field>Opportunity.Amount</field>
+            <operation>equals</operation>
+            <value>0</value>
+        </criteriaItems>
+        <criteriaItems>
+            <field>Opportunity.Amount</field>
+            <operation>equals</operation>
+        </criteriaItems>
+        <criteriaItems>
+            <field>Opportunity.Fair_Market_Value__c</field>
+            <operation>notEqual</operation>
+            <value>0</value>
+        </criteriaItems>
+        <criteriaItems>
+            <field>Opportunity.Fair_Market_Value__c</field>
+            <operation>notEqual</operation>
+        </criteriaItems>
+        <description>Enable this rule to copy the Fair Market Value to the Amount field, when the Amount is zero or blank.</description>
+        <triggerType>onCreateOrTriggeringUpdate</triggerType>
+    </rules>
     <rules>
         <fullName>Opportunity Email Acknowledgment</fullName>
         <actions>
@@ -46,7 +85,7 @@
             <type>FieldUpdate</type>
         </actions>
         <active>false</active>
-        <description>Emails an acknowledgment to the Primary Contact when Email Acknowledgment is set.</description>
+        <description>Emails an acknowledgement to the Primary Contact for an Opportunity when the Acknowledgement Status is set to Email Acknowledgement Now.</description>
         <formula>TEXT(Acknowledgment_Status__c) = $Label.sendAcknowledgmentFireStatus &amp;&amp;  Primary_Contact__r.Email &lt;&gt; NULL &amp;&amp;  Primary_Contact__r.Do_Not_Contact__c &lt;&gt; True &amp;&amp;  Primary_Contact__r.HasOptedOutOfEmail &lt;&gt; True &amp;&amp;  Primary_Contact__r.Deceased__c &lt;&gt; True</formula>
         <triggerType>onCreateOrTriggeringUpdate</triggerType>
     </rules>

@@ -38,7 +38,7 @@ public with sharing class STG_InstallScript_TEST2 {
     //If the handlers in our default TDTM config are different from what it's in the org (either action or load order),
     //and the user did not flag them as user managed, we need to update them
     public static testmethod void handlersChanged() {
-    	//Handlers that exist in the org
+      //Handlers that exist in the org
         List<Trigger_Handler__c> oldHandlers = new List<Trigger_Handler__c>();
         oldHandlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false, 
               Class__c = 'AFFL_Affiliations_TDTM', Load_Order__c = 1, Object__c = 'Contact', 
@@ -49,10 +49,10 @@ public with sharing class STG_InstallScript_TEST2 {
         oldHandlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false, 
               Class__c = 'REL_Relationships_Con_TDTM', Load_Order__c = 1, Object__c = 'Contact', 
               Trigger_Action__c = 'AfterInsert;AfterDelete'));
-    	insert oldHandlers;
-    	
-    	//Updated handlers
-    	List<Trigger_Handler__c> updatedHandlers = new List<Trigger_Handler__c>();
+      insert oldHandlers;
+      
+      //Updated handlers
+      List<Trigger_Handler__c> updatedHandlers = new List<Trigger_Handler__c>();
         updatedHandlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false, 
               Class__c = 'AFFL_Affiliations_TDTM', Load_Order__c = 1, Object__c = 'Contact', 
               Trigger_Action__c = 'AfterInsert;AfterUpdate'));
@@ -62,13 +62,13 @@ public with sharing class STG_InstallScript_TEST2 {
         updatedHandlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false, 
               Class__c = 'REL_Relationships_Con_TDTM', Load_Order__c = 2, Object__c = 'Contact', 
               Trigger_Action__c = 'AfterInsert;AfterUpdate;AfterDelete'));
-    	
-    	Test.startTest();
-    	STG_InstallScript.insertTdtmDefaults(updatedHandlers);
-    	Test.stopTest();
-    	
-    	//Verify handlers have been updated
-    	List<Trigger_Handler__c> newHandlers = [select Load_Order__c, Class__c, Trigger_Action__c from Trigger_Handler__c order by Load_Order__c];
+      
+      Test.startTest();
+      STG_InstallScript.insertTdtmDefaults(updatedHandlers);
+      Test.stopTest();
+      
+      //Verify handlers have been updated
+      List<Trigger_Handler__c> newHandlers = [select Load_Order__c, Class__c, Trigger_Action__c from Trigger_Handler__c order by Load_Order__c];
         System.assertEquals(0, newHandlers[0].Load_Order__c);   
         System.assertEquals('REL_Relationships_Cm_TDTM', newHandlers[0].Class__c);   
         System.assertEquals('AfterInsert;AfterUpdate', newHandlers[0].Trigger_Action__c);

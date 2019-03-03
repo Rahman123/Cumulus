@@ -29,7 +29,9 @@
 */
 /**
 * @author Salesforce.org
-* @description Implements relationships behavior 
+* @date 2013
+* @group Relationships
+* @description Trigger Handler on Contact that implements automatic relationship creation.
 */
 public class REL_Relationships_Con_TDTM extends TDTM_Runnable {
     
@@ -121,7 +123,13 @@ public class REL_Relationships_Con_TDTM extends TDTM_Runnable {
                 //add the changed gender's relationship and reciprocal
                 if (changedGender.contains(rel.npe4__RelatedContact__c)) {
                     listRelsForUpdate.add(rel);
-                    listMirrorRels.add(mapRelationship.get(rel.npe4__ReciprocalRelationship__c));
+                    // Normally there should be a reciprical relationship defined, but in some scenarios
+                    // (particularly with client bulk data loading of relationships), this field may be
+                    // blank. In these cases, rather than have the system throw an unfriendly exception
+                    // when attempting to udpate the reciprical record, we'll ignore the data entirely.
+                    if (rel.npe4__ReciprocalRelationship__c != null && mapRelationship.containsKey(rel.npe4__ReciprocalRelationship__c)) {
+                        listMirrorRels.add(mapRelationship.get(rel.npe4__ReciprocalRelationship__c));
+                    }
                 }
             }
 

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <enableEnhancedLookup>false</enableEnhancedLookup>
+    <fields>
+        <fullName>Matched_Donor_Role__c</fullName>
+        <description>The Contact Role you want to use for matched donors. We recommend using &quot;Matched Donor.&quot;</description>
+        <externalId>false</externalId>
+        <inlineHelpText>The Contact Role you want to use for matched donors. We recommend using &quot;Matched Donor.&quot;</inlineHelpText>
+        <label>Matched Donor Role</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Use_Dated_Conversion_Rates__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <inlineHelpText>Check this box to use Dated Conversion Rates when Advanced Currency Management is enabled in this Organization. If unchecked and ACM is enabled, all NPSP roll-ups will use the default exchange rate for by currency.</inlineHelpText>
+        <label>Use Dated Conversion Rates if available</label>
+        <trackTrending>false</trackTrending>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Opportunity_Committed_Stages__c</fullName>
+        <description>These Opportunity Stages are Committed; additional payments are expected.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Specify which Opportunity Stage(s) are in a Committed state, with additional payments expected. When defining multiple stages, separate them with a semicolon.</inlineHelpText>
+        <label>Opportunity Committed Stage(s)</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Opportunity_Finalized_Stages__c</fullName>
+        <description>These Opportunity Stages are Finalized; no additional payments are expected. </description>
+        <externalId>false</externalId>
+        <inlineHelpText>Specify which Opportunity Stage(s) are in a Finalized state, with no additional payments  expected. When defining multiple stages, separate them with a semicolon.</inlineHelpText>
+        <label>Opportunity Finalized Stage(s)</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+</CustomObject>

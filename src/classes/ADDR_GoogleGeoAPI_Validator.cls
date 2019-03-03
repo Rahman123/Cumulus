@@ -30,6 +30,7 @@
 /**
 * @author Salesforce.org
 * @date 2014
+* @group Address Management
 * @description Validator to provide address geocoding/verification through the Google Geocoding API
  */
 public with sharing class ADDR_GoogleGeoAPI_Validator implements ADDR_IValidator{
@@ -165,7 +166,8 @@ public with sharing class ADDR_GoogleGeoAPI_Validator implements ADDR_IValidator
 
                 String verified_street = '';
                 String verified_premise = '';
-                if (googresp.status == 'OK' && googresp.results.size() == 1 && !(settings.Reject_Ambiguous_Addresses__c && googresp.results[0].partial_match)){
+                if (googresp.status == 'OK' && googresp.results != null && googresp.results.size() == 1 && 
+                    !(settings.Reject_Ambiguous_Addresses__c && googresp.results[0].partial_match == true)){
 
                     for (ADDR_GoogleGeoAPI_Validator.Address_components add : googresp.results[0].address_components){
                         Set<String> type_set = new Set<String>();
@@ -185,7 +187,7 @@ public with sharing class ADDR_GoogleGeoAPI_Validator implements ADDR_IValidator
                             }
                         } else if (type_set.contains('country')){
                             a.MailingCountry__c = add.short_name;
-                        } else if (type_set.contains('administratrive_area_level_1')){
+                        } else if (type_set.contains('administrative_area_level_1')){
                             a.MailingState__c = add.short_name;
                         } else if (type_set.contains('administrative_area_level_2')){
                             a.County_Name__c = add.long_name;
@@ -217,9 +219,9 @@ public with sharing class ADDR_GoogleGeoAPI_Validator implements ADDR_IValidator
                     a.Verified__c = true;
                     a.API_Response__c = trimResponse(response);
                     a.Verification_Status__c = Label.Addr_Verified;
-                } else if ((googresp.status == 'OK' && googresp.results.size() > 1) || (googresp.results.size() == 1 && settings.Reject_Ambiguous_Addresses__c && googresp.results[0].partial_match)){
+                } else if ((googresp.status == 'OK' && googresp.results.size() > 1) || (googresp.results.size() == 1 && settings.Reject_Ambiguous_Addresses__c && googresp.results[0].partial_match == true)){
                     a.Ambiguous__c = true;
-                    a.Verified__c = false;
+                    a.Verified__c = true;
                     a.API_Response__c = trimResponse(response);
                     a.Verification_Status__c = 'Ambiguous';
                 } else if (googresp.status == 'OVER_QUERY_LIMIT'){
@@ -235,16 +237,16 @@ public with sharing class ADDR_GoogleGeoAPI_Validator implements ADDR_IValidator
                     a.API_Response__c = 'UNKNOWN_ERROR: indicates that the request could not be processed due to a server error. The request may succeed if you try again.';
                     a.Verification_Status__c = a.API_Response__c;
                 } else if (googresp.status == 'INVALID_REQUEST'){
-                    a.Verified__c = false;
+                    a.Verified__c = true;
                     a.API_Response__c = 'INVALID_REQUEST: generally indicates that the query (address, components or latlng) is missing.';
                     a.Verification_Status__c = a.API_Response__c;
                 } else if (googresp.status == 'ZERO_RESULTS'){
-                    a.Verified__c = false;
+                    a.Verified__c = true;
                     a.API_Response__c = 'ZERO_RESULTS: indicates that the geocode was successful but returned no results. This may occur if the geocoder was passed a non-existent address.';
                     a.Verification_Status__c = a.API_Response__c;
                 }
                 else{
-                    a.Verified__c = false;
+                    a.Verified__c = true;
                     //Truncating body response to avoid STRING_TOO_LONG error.
                     a.API_Response__c = 'STATUS: ' + googresp.status + ' BODY: '+ trimResponse(response);
                     a.Verification_Status__c = a.API_Response__c;

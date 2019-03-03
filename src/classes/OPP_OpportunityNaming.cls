@@ -52,7 +52,7 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
     /*********************************************************************************************************
     * @description A map to match opportunity record type and attribution info to the appropriate setting.
     */
-    private static map<string,Opportunity_Naming_Settings__c> mapOppNameSettings;
+    private static map<string,Opportunity_Naming_Settings__c> mapOppIdSettings;
 
     /*******************************************************************************************************
     * @description Calculates opportunity names based on Opportunity Naming Settings using the primary Contact
@@ -146,10 +146,10 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
     * @return Opportunity_Naming_Settings__c The opp name setting for this Opportunity if it exists.
     ********************************************************************************************************/
     public static Opportunity_Naming_Settings__c getONS(Opportunity opp) {
-        if (mapOppNameSettings.containsKey(getOppAttribution(opp) + opp.RecordType.Name)) {
-            return mapOppNameSettings.get(getOppAttribution(opp) + opp.RecordType.Name);
-        } else if (mapOppNameSettings.containsKey(getOppAttribution(opp))) {
-            return mapOppNameSettings.get(getOppAttribution(opp));
+        if (mapOppIdSettings.containsKey(getOppAttribution(opp) + opp.RecordTypeId)) {
+            return mapOppIdSettings.get(getOppAttribution(opp) + opp.RecordTypeId);
+        } else if (mapOppIdSettings.containsKey(getOppAttribution(opp))) {
+            return mapOppIdSettings.get(getOppAttribution(opp));
         }
         return null;
     }
@@ -171,22 +171,40 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
     }
 
     /*******************************************************************************************************
-    * @description Fills the mapOppNameSettings map with record type and attribution info and all settings.
+    * @description Fills the mapOppIdSettings map with record type and attribution info and all settings.
     ********************************************************************************************************/
     public static void fillOppNameSettings() {
-        listOppNamingSettings = Opportunity_Naming_Settings__c.getAll().clone().values();
-        mapOppNameSettings = new map<string,Opportunity_Naming_Settings__c>();
+        listOppNamingSettings = UTIL_ListCustomSettingsFacade.getMapOppNamingSettings().clone().values();
+        mapOppIdSettings = new map<string,Opportunity_Naming_Settings__c>();
         for (Opportunity_Naming_Settings__c ons : listOppNamingSettings) {
 
-            list<string> oppRecTypes = string.isBlank(ons.Opportunity_Record_Types__c) ? new list<string>{''} : ons.Opportunity_Record_Types__c.split(';',0);
+            List<String> oppRecTypeStrings = string.isBlank(ons.Opportunity_Record_Types__c) ? new List<String>() : ons.Opportunity_Record_Types__c.split(';', 0);
+            List<Id> oppRecTypeIds = new List<Id>();
+            for (String recTypeString : oppRecTypeStrings) {
+                if (!String.isBlank(recTypeString)) {
+                    try {
+                        oppRecTypeIds.add((id)recTypeString);
+                    } catch (Exception e) {}
+                }
+            }
 
-            for (string recTypeName : oppRecTypes) {
-                mapOppNameSettings.put(recTypeName,ons);
+            if (oppRecTypeIds.isEmpty()) {
+                mapOppIdSettings.put('', ons);
                 if (ons.Attribution__c == Label.oppNamingBoth) {
-                    mapOppNameSettings.put(Label.oppNamingIndividual+recTypeName,ons);
-                    mapOppNameSettings.put(Label.oppNamingOrganizational+recTypeName,ons);
+                    mapOppIdSettings.put(Label.oppNamingIndividual,ons);
+                    mapOppIdSettings.put(Label.oppNamingOrganizational,ons);
                 } else {
-                    mapOppNameSettings.put(ons.Attribution__c+recTypeName, ons);
+                    mapOppIdSettings.put(ons.Attribution__c, ons);
+                }
+            } else {
+                for (Id recTypeId : oppRecTypeIds) {
+                    mapOppIdSettings.put(recTypeId,ons);
+                    if (ons.Attribution__c == Label.oppNamingBoth) {
+                        mapOppIdSettings.put(Label.oppNamingIndividual+recTypeId,ons);
+                        mapOppIdSettings.put(Label.oppNamingOrganizational+recTypeId,ons);
+                    } else {
+                        mapOppIdSettings.put(ons.Attribution__c+recTypeId, ons);
+                    }
                 }
             }
         }
@@ -198,7 +216,7 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
     * @return string Individual or Organizational, based on the opportunity's attribution.
     ********************************************************************************************************/
     public static string getOppAttribution(Opportunity opp) {
-        if (opp.Account.npe01__SYSTEMIsIndividual__c)
+        if (opp.Account == null || opp.Account.npe01__SYSTEMIsIndividual__c)
             return Label.oppNamingIndividual;
         else
             return Label.oppNamingOrganizational;
@@ -244,6 +262,10 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
         for (string field : getOppFields(fields)) {
             result += field + ', ';
         }
+        if (UTIL_Currency.getInstance().isMultiCurrencyOrganization() && !result.containsIgnoreCase('currencyisocode')) {
+            result += ' CurrencyIsoCode, ';
+        }
+
         result += '(' + getConRoleQuery(fields) + ' WHERE IsPrimary=TRUE LIMIT 1) ';
         result += 'FROM Opportunity';
         return result;
@@ -260,6 +282,9 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
         string result = 'SELECT ';
         for (string field : getConFields(fields)) {
             result += field.substring(field.indexOf('.')+1) + ', ';
+        }
+        if (UTIL_Currency.getInstance().isMultiCurrencyOrganization() && !result.containsIgnoreCase('currencyisocode')) {
+            result += ' CurrencyIsoCode, ';
         }
 
         result = result.substring(0, result.length()-2) + ' FROM Contact';
@@ -360,8 +385,8 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
             }
 
             //traverse parent relationships until the last one
-            if (thisObj!=null) {
-                for (string parentObj : splitField) {
+            for (string parentObj : splitField) {
+                if (thisObj!=null) {
                     thisObj = thisObj.getsObject(parentObj);
                 }
             }
@@ -410,7 +435,15 @@ public with sharing class OPP_OpportunityNaming implements OPP_INaming {
             }
         } else if (dt == Schema.DisplayType.Currency) {
             if (obj.get(fieldName.trim())!=null) {
-                result = Label.npe01.DefaultContactTransactionCurrency + String.valueOf(obj.get(fieldName.trim()));
+                String currCode = null;
+                if (UTIL_Currency.getInstance().isMultiCurrencyOrganization()) {
+                    currCode = (String) obj.get('CurrencyIsoCode');
+                }
+                String currencySymbol = UTIL_Currency.getInstance().getCurrencySymbol(currCode);
+                if (currencySymbol.length() == 3) {
+                    currencySymbol += ' ';
+                }
+                result = currencySymbol + String.valueOf(obj.get(fieldName.trim()));
                 if (result.endsWith('.00'))
                     result = result.subString(0,result.length()-3);    
             }

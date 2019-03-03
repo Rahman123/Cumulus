@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
     <customSettingsType>Hierarchy</customSettingsType>
-    <customSettingsVisibility>Public</customSettingsVisibility>
     <description>Settings for the allocation of Opportunities into General Accounting Units.</description>
     <enableFeeds>false</enableFeeds>
     <fields>
@@ -51,6 +50,16 @@
         <unique>false</unique>
     </fields>
     <fields>
+        <fullName>Payment_Allocations_Enabled__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Indicates whether Allocations can be set at the Payment level. If selected, you can manually create Allocation records for each Payment, or let NPSP automatically create Payment Allocation records based on the related Opportunity Allocation settings.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Indicates whether Allocations can be set at the Payment level. Review the documentation about Payment-level Allocations before changing this setting.</inlineHelpText>
+        <label>Payment Allocations Enabled</label>
+        <trackTrending>false</trackTrending>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
         <fullName>Rollup_N_Day_Value__c</fullName>
         <defaultValue>365</defaultValue>
         <description>This value affects the number of days to count for N Days Allocations rollup fields.</description>
@@ -75,4 +84,5 @@
         <type>Checkbox</type>
     </fields>
     <label>Allocations Settings</label>
+    <visibility>Public</visibility>
 </CustomObject>

@@ -35,11 +35,11 @@
 * @description  Trigger handler for Affiliations related operations on Contacts, Accounts, or Affiliations.
 */
 public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
+    @TestVisible
+    private static String DEFAULT_FORMER_STATUS = 'Former';
 
-    // static flags to prevent some recursive calls 
-    public static boolean doNotRunForContacts = false;
-    public static boolean hasRunForAffiliations = false;
-    public static boolean hasRunForAccounts = false;
+    @TestVisible
+    private static String DEFAULT_CURRENT_STATUS = 'Current';
 
     /*******************************************************************************************************
     * @description Trigger Handler on Contact, Account, or Affiliation, dispatches to the correct method
@@ -53,34 +53,40 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
     ********************************************************************************************************/    
     public override DmlWrapper run(List<SObject> newlist, List<SObject> oldlist, 
         TDTM_Runnable.Action triggerAction, Schema.DescribeSObjectResult objResult) {
-            
+
+        DmlWrapper wrapper;
+
         // dispatch to the correct handler
-        if (objResult.getsObjectType() == Contact.sObjectType && !doNotRunForContacts) {
-            DmlWrapper wrapper = runContactTriggerHandler(newlist, oldlist, triggerAction, objResult);
-            
-            // we used to prevent any further recursive call with contacts and affiliations,
-            // but it turns out in some scenarios, before the AfterInsert of a contact calls us,
-            // another trigger handler may update the contact, causing the AfterUpdate to come thru.
-            // if we set the flag to stop recursion, then we won't process the AfterInsert, where
-            // we create the initial affiliation. thus we no longer set a recursion prevention flag,
-            // and we only use doNotRunForContacts where we actually have a use case to prevent recursion.
-            // as for the Affiliations and Account recursion flags, we have no current known issues with
-            // their recursion prevention, so we left that as is.
-            //
-            // hasRunForContacts = true;
-            
-            return wrapper;
-        } else if (objResult.getsObjectType() == npe5__Affiliation__c.sObjectType && !hasRunForAffiliations) {
-            DmlWrapper wrapper = runAfflTriggerHandler(newlist, oldlist, triggerAction, objResult);
-            hasRunForAffiliations = true;
-            return wrapper;
-        } else if (objResult.getsObjectType() == Account.sObjectType && !hasRunForAccounts) {
-            DmlWrapper wrapper = runAccountTriggerHandler(newlist, oldlist, triggerAction, objResult);
-            hasRunForAccounts = true;
-            return wrapper;
+        if (objResult.getsObjectType() == Contact.sObjectType && !TDTM_ProcessControl.isRecursive(TDTM_ProcessControl.flag.AFFL_doNotRunForContacts)) {
+            wrapper = runContactTriggerHandler(newlist, oldlist, triggerAction, objResult);
+
+        } else if (objResult.getsObjectType() == npe5__Affiliation__c.sObjectType && !TDTM_ProcessControl.isRecursive(TDTM_ProcessControl.flag.AFFL_hasRunForAffiliations)) {
+            TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.AFFL_hasRunForAffiliations, true);
+            wrapper = runAfflTriggerHandler(newlist, oldlist, triggerAction, objResult);
+
+        } else if (objResult.getsObjectType() == Account.sObjectType && !TDTM_ProcessControl.isRecursive(TDTM_ProcessControl.flag.AFFL_hasRunForAccounts)) {
+            TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.AFFL_hasRunForAccounts, true);
+            wrapper = runAccountTriggerHandler(newlist, oldlist, triggerAction, objResult);
+
         } else {
             return null;
         }
+
+        // Process the DML
+        TDTM_TriggerHandler.processDML(wrapper);
+
+        // Decrement the recursion counters based on related processing logic
+        if (objResult.getsObjectType() == npe5__Affiliation__c.sObjectType) {
+            TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.AFFL_hasRunForAffiliations, false);
+            if (TDTM_ProcessControl.isRecursive(TDTM_ProcessControl.flag.AFFL_hasRunForAccounts)) {
+                TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.AFFL_doNotRunForContacts, false);
+            }
+
+        } else if (objResult.getsObjectType() == Account.sObjectType) {
+            TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.AFFL_hasRunForAccounts, false);
+        }
+
+        return null;
     }
                 
     /*******************************************************************************************************
@@ -120,7 +126,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                     if (contact.AccountId != null) {
                         string strComboKey = strComboKeyFromContactIdAccountId(contact.Id, contact.AccountId);
                         AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                        if (ao == null) ao = new AfflOps(contact.Id, contact.AccountId);
+                        if (ao == null) {
+                            ao = new AfflOps(contact.Id, contact.AccountId);
+                        }
                         ao.fCurrent = true;
                         ao.strRole = contact.Title;
                         mapStrComboKeyAfflOps.put(strComboKey, ao);
@@ -128,7 +136,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                     if (contact.Primary_Affiliation__c != null) {
                         string strComboKey = strComboKeyFromContactIdAccountId(contact.Id, contact.Primary_Affiliation__c);                     
                         AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                        if (ao == null) ao = new AfflOps(contact.Id, contact.Primary_Affiliation__c);
+                        if (ao == null) {
+                            ao = new AfflOps(contact.Id, contact.Primary_Affiliation__c);
+                        }
                         ao.fCurrent = true;
                         ao.fPrimary = true;
                         ao.strRole = contact.Title;
@@ -144,7 +154,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                         if (contact.AccountId != null) {
                             string strComboKey = strComboKeyFromContactIdAccountId(contact.Id, contact.AccountId);
                             AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                            if (ao == null) ao = new AfflOps(contact.Id, contact.AccountId);
+                            if (ao == null) {
+                                ao = new AfflOps(contact.Id, contact.AccountId);
+                            }
                             ao.fCurrent = true;
                             ao.strRole = contact.Title;
                             mapStrComboKeyAfflOps.put(strComboKey, ao);
@@ -162,7 +174,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                         if (contact.Primary_Affiliation__c != null) {
                             string strComboKey = strComboKeyFromContactIdAccountId(contact.Id, contact.Primary_Affiliation__c);                     
                             AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                            if (ao == null) ao = new AfflOps(contact.Id, contact.Primary_Affiliation__c);
+                            if (ao == null) {
+                                ao = new AfflOps(contact.Id, contact.Primary_Affiliation__c);
+                            }
                             ao.fCurrent = true;
                             ao.fPrimary = true;
                             ao.strRole = contact.Title;
@@ -171,7 +185,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                         if (oldContact.Primary_Affiliation__c != null) {
                             string strComboKey = strComboKeyFromContactIdAccountId(oldContact.Id, oldContact.Primary_Affiliation__c);                     
                             AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                            if (ao == null) ao = new AfflOps(oldContact.Id, oldContact.Primary_Affiliation__c);
+                            if (ao == null) {
+                                ao = new AfflOps(oldContact.Id, oldContact.Primary_Affiliation__c);
+                            }
                             ao.fFormer = true;
                             ao.fUnprimary = true;
                             mapStrComboKeyAfflOps.put(strComboKey, ao);
@@ -187,7 +203,10 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
             }
 
         }
-        return dmlWrapper;
+
+        // perform all dml before exiting this handler method.
+        TDTM_TriggerHandler.processDml(dmlWrapper);
+        return null;
     }
 
     /*******************************************************************************************************
@@ -226,7 +245,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                     if (triggerAction == TDTM_Runnable.Action.AfterInsert) {
                         string strComboKey = strComboKeyFromContactIdAccountId(account.npe01__One2OneContact__c, account.id);
                         AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                        if (ao == null) ao = new AfflOps(account.npe01__One2OneContact__c, account.id);
+                        if (ao == null) {
+                            ao = new AfflOps(account.npe01__One2OneContact__c, account.id);
+                        }
                         ao.fCurrent = true;
                         mapConIdToAfflOps.put(account.npe01__One2OneContact__c, ao);
                         mapStrComboKeyAfflOps.put(strComboKey, ao);
@@ -239,7 +260,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                         if (account.npe01__One2OneContact__c != oldAccount.npe01__One2OneContact__c) {
                             string strComboKey = strComboKeyFromContactIdAccountId(account.npe01__One2OneContact__c, account.id);
                             AfflOps ao = mapStrComboKeyAfflOps.get(strComboKey);
-                            if (ao == null) ao = new AfflOps(account.npe01__One2OneContact__c, account.id);
+                            if (ao == null) {
+                                ao = new AfflOps(account.npe01__One2OneContact__c, account.id);
+                            }
                             ao.fCurrent = true;
                             mapConIdToAfflOps.put(account.npe01__One2OneContact__c, ao);
                             mapStrComboKeyAfflOps.put(strComboKey, ao);
@@ -287,16 +310,20 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
         
         ID ContactId {
             get {
-                if (strComboKey == null) return null;
+                if (strComboKey == null) {
+                    return null;
+                }
                 return strComboKey.left(strComboKey.indexOf('|'));
-            }
+            } private set;
         }
         
         ID AccountId {
             get {
-                if (strComboKey == null) return null;
+                if (strComboKey == null) {
+                    return null;
+                }
                 return strComboKey.substring(strComboKey.indexOf('|') + 1);
-            }
+            } private set;
         }
         
     }
@@ -339,7 +366,7 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
         map<string, npe5__Affiliation__c> mapStrComboKeyAffl = new map<string, npe5__Affiliation__c>();
 
         for (npe5__Affiliation__c a : [Select Id, npe5__Contact__c, npe5__Organization__c from npe5__Affiliation__c 
-            where npe5__EndDate__c = null and npe5__Contact__c in :setContactId and npe5__Organization__c in :setAccountId]) {
+                where npe5__EndDate__c = null and npe5__Contact__c in :setContactId and npe5__Organization__c in :setAccountId]) {
             mapStrComboKeyAffl.put(strComboKeyFromContactIdAccountId(a.npe5__Contact__c, a.npe5__Organization__c), a);
         }
 
@@ -354,14 +381,16 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                     npe5__Affiliation__c existingAffl = mapStrComboKeyAffl.get(ao.strComboKey);
                     if (existingAffl != null) {
                         existingAffl.npe5__EndDate__c = null;
-                        existingAffl.npe5__Status__c = system.label.npe5.DefaultCurrentStatus;
-                        if (ao.fPrimary) existingAffl.npe5__Primary__c = ao.fPrimary;
+                        existingAffl.npe5__Status__c = DEFAULT_CURRENT_STATUS;
+                        if (ao.fPrimary) {
+                            existingAffl.npe5__Primary__c = ao.fPrimary;
+                        }
                         listAfflIdAfflUpdate.add(existingAffl);
                     } else {
                         npe5__Affiliation__c a = new npe5__Affiliation__c();
                         a.npe5__Contact__c = contactId;
                         a.npe5__Organization__c = accountId;
-                        a.npe5__Status__c = system.label.npe5.DefaultCurrentStatus;
+                        a.npe5__Status__c = DEFAULT_CURRENT_STATUS;
                         a.npe5__StartDate__c = System.Today();
                         a.npe5__Role__c = ao.strRole;
                         a.npe5__Primary__c = ao.fPrimary;
@@ -375,14 +404,14 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                npe5__Affiliation__c a = mapStrComboKeyAffl.get(ao.strComboKey);
                if (a != null) {
                    a.npe5__EndDate__c = null;
-                   a.npe5__Status__c = system.label.npe5.DefaultCurrentStatus;
+                   a.npe5__Status__c = DEFAULT_CURRENT_STATUS;
                    a.npe5__Primary__c = true;
                    listAfflIdAfflUpdate.add(a);
                } else {
                     a = new npe5__Affiliation__c();
                     a.npe5__Contact__c = contactId;
                     a.npe5__Organization__c = accountId;
-                    a.npe5__Status__c = system.label.npe5.DefaultCurrentStatus;
+                    a.npe5__Status__c = DEFAULT_CURRENT_STATUS;
                     a.npe5__StartDate__c = System.Today();
                     a.npe5__Role__c = ao.strRole;
                     a.npe5__Primary__c = true;
@@ -398,7 +427,7 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                
                if (ao.fFormer) {
                     //flag it as former ending today
-                    a.npe5__Status__c = system.label.npe5.DefaultFormerStatus;
+                    a.npe5__Status__c = DEFAULT_FORMER_STATUS;
                     a.npe5__EndDate__c = System.Today();                
                }
                if (ao.fUnprimary) {
@@ -434,25 +463,38 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
         TDTM_Runnable.Action triggerAction, Schema.DescribeSObjectResult objResult) {
 
         DmlWrapper dmlWrapper = new DmlWrapper();
-        
+
         map<Id, Id> mapConIdAccIdPrimary = new map<Id, Id>();
         map<Id, Id> mapConIdAccIdUnprimary = new map<Id, Id>();
+        
+        //holds primary affiliations that have been undeleted
+        map<Id, npe5__Affiliation__c> mapConIdAfflUndelete = new map<Id, npe5__Affiliation__c>();
         
         //holds which primary affiliation is being used in case of multiple primary affiliations for a single contact
         map<Id, Id> mapConIdAfflIdPrimary = new map<Id, Id>();
         
-        for (integer i = 0; i<newlist.size(); i++) {
+        list<npe5__Affiliation__c> afflForUpdate = new list<npe5__Affiliation__c>();
+
+        // AFTER DELETE, remove Primary Affiliation from Contact if this affiliation is marked Primary
+        if (triggerAction == TDTM_Runnable.Action.AfterDelete) {
+            for (npe5__Affiliation__c affl : (List<npe5__Affiliation__c>) oldlist) {
+                if (affl.npe5__Primary__c) {
+                    mapConIdAccIdUnprimary.put(affl.npe5__Contact__c, affl.npe5__Organization__c);                    
+                }
+            }
+        // newlist is null for after delete, so only iterate over newlist for other triggerActions
+        } else for (integer i = 0; i<newlist.size(); i++) {
             npe5__Affiliation__c affl = (npe5__Affiliation__c)newlist[i];
 
-            // AFTER INSERT
+            // AFTER INSERT, set contact primary affiliation field for primary affiliations
             if (triggerAction == TDTM_Runnable.Action.AfterInsert) {
-                if (affl.npe5__Primary__c && affl.npe5__Contact__c != null && affl.npe5__Organization__c != null) {
+                if (affl.npe5__Primary__c) {
                     mapConIdAccIdPrimary.put(affl.npe5__Contact__c, affl.npe5__Organization__c);
                     mapConIdAfflIdPrimary.put(affl.npe5__Contact__c, affl.Id);
                 }        
             }
             
-            // AFTER UPDATE
+            // AFTER UPDATE, update contact primary affiliation field for affiliations marked or unmarked primary
             if (triggerAction == TDTM_Runnable.Action.AfterUpdate) {
                 npe5__Affiliation__c afflOld = (npe5__Affiliation__c)oldlist[i];
                 if (affl.npe5__Primary__c != afflOld.npe5__Primary__c) {
@@ -464,19 +506,27 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                     }
                 }
             }
+
+            //AFTER UNDELETE, update contact primary affiliation if blank, otherwise uncheck primary
+            if (triggerAction == TDTM_Runnable.Action.AfterUndelete) {
+                if (affl.npe5__Primary__c) {
+                    mapConIdAfflUndelete.put(affl.npe5__Contact__c, affl);
+                }
+            }
         }
 
-        // update contacts' primary affiliation field as appropriate
+        // update contacts' primary affiliation field
         set<id> setAllContactIds = new set<id>();
         setAllContactIds.addAll(mapConIdAccIdPrimary.keySet());
         setAllContactIds.addAll(mapConIdAccIdUnprimary.keySet());
+        setAllContactIds.addAll(mapConIdAfflUndelete.keySet());
 
         if (!setAllContactIds.isEmpty()) {
             list<Contact> conForUpdate = new list<Contact>();
             list<Contact> queryCon = [SELECT Id, Primary_Affiliation__c FROM Contact WHERE Id IN :setAllContactIds];
             
             for (Contact con : queryCon) {
-                if (mapConIdAccIdPrimary.containsKey(con.id)) {
+                if (mapConIdAccIdPrimary.containsKey(con.id) && con.Primary_Affiliation__c != mapConIdAccIdPrimary.get(con.id)) {
                     con.Primary_Affiliation__c = mapConIdAccIdPrimary.get(con.id);
                     conForUpdate.add(con);
 
@@ -484,28 +534,47 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                 } else if (mapConIdAccIdUnprimary.containsKey(con.id) && con.Primary_Affiliation__c == mapConIdAccIdUnprimary.get(con.id)) {
                     con.Primary_Affiliation__c = null;
                     conForUpdate.add(con);
+
+                //UNDELETE case: only update primary affiliation on contact if the lookup is blank, otherwise uncheck primary
+                } else if (mapConIdAfflUndelete.containsKey(con.id)) {
+                    npe5__Affiliation__c affl = mapConIdAfflUndelete.get(con.id);
+                    if (con.Primary_Affiliation__c == null) {
+                        con.Primary_Affiliation__c = affl.npe5__Organization__c;
+                        conForUpdate.add(con);
+                    } else {
+                        //Can't use record in trigger set for update, so create a new one
+                        afflForUpdate.add(new npe5__Affiliation__c(Id=affl.id, npe5__Primary__c=false));
+                    }
                 }
             }
 
             if (!conForUpdate.isEmpty()) {
-                doNotRunForContacts = true;
+                TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.AFFL_doNotRunForContacts, true);
                 dmlWrapper.objectsToUpdate.addAll((List<SObject>)conForUpdate);
             }
         }
 
         if (!mapConIdAccIdPrimary.isEmpty()) {
             //uncheck any existing primary affiliations
-            list<npe5__Affiliation__c> afflForUpdate = new list<npe5__Affiliation__c>();
-            list<npe5__Affiliation__c> queryAffl = [SELECT Id, npe5__Contact__c, npe5__Organization__c FROM npe5__Affiliation__c WHERE npe5__Primary__c = TRUE AND npe5__Contact__c IN :mapConIdAccIdPrimary.keySet() AND ID NOT IN :mapConIdAfflIdPrimary.values()];
-        
+            list<npe5__Affiliation__c> queryAffl = [SELECT Id, npe5__Contact__c, npe5__Organization__c FROM npe5__Affiliation__c 
+                                                    WHERE npe5__Primary__c = TRUE AND npe5__Contact__c IN :mapConIdAccIdPrimary.keySet()];
+            
+            //filtering out any current primary affiliations manually to avoid a query using NOT IN, 
+            //which causes an inefficient table scan that can fail on large data volumes
+            Set<Id> currentPrimaryAffl = new Set<Id>(mapConIdAfflIdPrimary.values());
             for (npe5__Affiliation__c affl : queryAffl) {
-                affl.npe5__Primary__c = false;
-                afflForUpdate.add(affl);
-            }
+                if (!currentPrimaryAffl.contains(affl.id)) {
+                    affl.npe5__Primary__c = false;
+                    affl.npe5__Status__c = DEFAULT_FORMER_STATUS;
+                    affl.npe5__EndDate__c = System.Today();
 
-            if (!afflForUpdate.isEmpty()) {
-                dmlWrapper.objectsToUpdate.addAll((List<SObject>)afflForUpdate);
+                    afflForUpdate.add(affl);
+                }
             }
+        }
+
+        if (!afflForUpdate.isEmpty()) {
+            dmlWrapper.objectsToUpdate.addAll((List<SObject>)afflForUpdate);
         }
 
         return dmlWrapper;
@@ -568,16 +637,18 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
                 
                 // primary checking
                 if (affl.npe5__Organization__c == con.Primary_Affiliation__c && afflPrimary == null) {
-                    if (affl.npe5__Primary__c)
+                    if (affl.npe5__Primary__c) {
                         afflPrimary = affl;
-                    else
+                    } else {
                         afflPrimaryBackup = affl;
+                    }
                 }
             }
             
             // if no Affiliation was correctly marked primary, take our backup
-            if (afflPrimary == null)
+            if (afflPrimary == null) {
                 afflPrimary = afflPrimaryBackup;
+            }
             
             //UTIL_Debug.debug('****DJH mapAfflKeyAffl: ' + mapAfflKeyAffl);
             
@@ -625,8 +696,9 @@ public class AFFL_Affiliations_TDTM extends TDTM_Runnable {
     * @return String The afflKey
     ********************************************************************************************************/
     private static string getAfflKey(npe5__Affiliation__c affl) {
-        if (affl == null)
+        if (affl == null) {
             return null;
+        }
         // do not include Primary
         string afflKey = 
             affl.npe5__Contact__c + ':' + 

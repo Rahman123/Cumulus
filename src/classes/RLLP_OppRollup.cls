@@ -97,7 +97,7 @@ public without sharing class RLLP_OppRollup {
                 rollupAccounts(amap);                               
             }   
             //do it @future
-            else if (Limits.getFutureCalls() < Limits.getLimitFutureCalls()){
+            else if (Limits.getAsyncCalls() < Limits.getLimitAsyncCalls()){
                 rollupAccountsFuture(amap.keySet());
             }                       
         }
@@ -108,8 +108,8 @@ public without sharing class RLLP_OppRollup {
                 RLLP_OppRollup.rollupContactsandHouseholdsForTrigger(contactRequerySet);                        
             else        	
                 RLLP_OppRollup.rollupContactsandHouseholdsForTriggerFuture(contactRequerySet);                        
-        }            
-    }       
+        }
+    }
     
     /*******************************************************************************************************
     * @description Future wrapper method for updating contacts and households from a set of opportunity IDs.
@@ -118,13 +118,7 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     @future 
     public static void rollupContactsandHouseholdsForTriggerFuture(set<id> OppIds) {
-    	Savepoint sp = Database.setSavepoint();
-        try {
-            rollupContactsandHouseholdsForTrigger(OppIds);
-        } catch(Exception e) {
-            Database.rollback(sp);
-            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
-        }
+        rollupContactsandHouseholdsForTrigger(OppIds);
     }
 
     /*******************************************************************************************************
@@ -166,22 +160,15 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     @future 
     public static void rollupAccountsFuture( set<id> acctIds ) {
-        Savepoint sp = Database.setSavepoint();
-        try {
-	        if (acctIds != null && !acctIds.isEmpty()) {
-	        	RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
-	            map<id, Account> amap = new map<id, account>((list<Account>)Database.query(oppRollupUtil.buildAccountQuery() + 
-	                                                           ' where id IN :acctIds')); 
-	            RLLP_OppRollup rg = new RLLP_OppRollup();
-	            rg.rollupAccounts(amap);
-	           
-	        }
-        } catch(Exception e) {
-            Database.rollback(sp);
-            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
+        if (acctIds != null && !acctIds.isEmpty()) {
+            RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
+            map<id, Account> amap = new map<id, account>((list<Account>)Database.query(oppRollupUtil.buildAccountQuery() + 
+                                                           ' where id IN :acctIds')); 
+            RLLP_OppRollup rg = new RLLP_OppRollup();
+            rg.rollupAccounts(amap);
         }
     }
-    
+
     /*******************************************************************************************************
     * @description Future wrapper method for updating contact rollups from a set of contact IDs.
     * @param acctIds A set of contact ids.
@@ -189,19 +176,13 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     @future
     public static void rollupContactsFuture (set<id> conIDs){
-        Savepoint sp = Database.setSavepoint();
-        try {
-	        if (conIds != null && !conIDs.isEmpty()){
-	        	RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
-	            map<id, Contact> cmap = new map<id, Contact>((list<Contact>)Database.query(oppRollupUtil.buildContactQuery() +
-	                                                          ' where id IN :conIds'));
-	            RLLP_OppRollup rg = new RLLP_OppRollup();
-	            rg.rollupContacts(cmap);
-	        }
-	    } catch(Exception e) {
-            Database.rollback(sp);
-            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
-        }     
+        if (conIds != null && !conIDs.isEmpty()){
+            RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
+            map<id, Contact> cmap = new map<id, Contact>((list<Contact>)Database.query(oppRollupUtil.buildContactQuery() +
+                                                          ' where id IN :conIds'));
+            RLLP_OppRollup rg = new RLLP_OppRollup();
+            rg.rollupContacts(cmap);
+        }
     }
 
     /*******************************************************************************************************
@@ -211,20 +192,14 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     @future
     public static void rollupHouseholdsFuture (set<id> hhIDs){
-    	Savepoint sp = Database.setSavepoint();
-        try {
-	        if (hhIds != null && !hhIds.isEmpty()){
-	        	RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
-	            map<id, npo02__Household__c> hhmap = new map<id, npo02__Household__c>((list<npo02__Household__c>)Database.query(oppRollupUtil.buildHouseholdQuery() +
-	                                                                            ' where id IN :hhIDs'));
-	            RLLP_OppRollup rg = new RLLP_OppRollup();
-	            rg.rollupHouseholds(hhmap);                                                                         
-	        }
-	    } catch(Exception e) {
-            Database.rollback(sp);
-            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
-        }       
-    } 
+        if (hhIds != null && !hhIds.isEmpty()){
+            RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
+            map<id, npo02__Household__c> hhmap = new map<id, npo02__Household__c>((list<npo02__Household__c>)Database.query(oppRollupUtil.buildHouseholdQuery() +
+                                                                            ' where id IN :hhIDs'));
+            RLLP_OppRollup rg = new RLLP_OppRollup();
+            rg.rollupHouseholds(hhmap);
+        }
+    }
 
     /*******************************************************************************************************
     * @description Runs opportunity rollups for accounts.
@@ -380,7 +355,8 @@ public without sharing class RLLP_OppRollup {
             }
         }         
 
-        update accountsToUpdate.values();     
+        UTIL_DMLService.updateRecordBatchAndLogErrors(accountsToUpdate.values(), ERR_Handler_API.Context.RLLP.name());
+
     }    
     
     /*******************************************************************************************************
@@ -462,8 +438,9 @@ public without sharing class RLLP_OppRollup {
                 
                 Contact c = contactsToUpdate.get(cid);
 
-                if(RLLP_OppRollup_UTIL.isMultiCurrency())
-                    yrAmt = RLLP_OppRollup_UTIL.ConvertFromCorporate((string)c.get('CurrencyIsoCode'),yrAmt);
+                if(RLLP_OppRollup_UTIL.isMultiCurrency()) {
+                    yrAmt = UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string)c.get('CurrencyIsoCode'),yrAmt);
+                }
 
                 if ((yrAmt > c.npo02__Best_Gift_Year_Total__c || c.npo02__Best_Gift_Year_Total__c==null ) && yr !=null){
                     c.npo02__Best_Gift_Year_Total__c = yrAmt;
@@ -539,7 +516,7 @@ public without sharing class RLLP_OppRollup {
             }                
         }
 
-        update contactsToUpdate.values();
+        UTIL_DMLService.updateRecordBatchAndLogErrors(contactsToUpdate.values(), ERR_Handler_API.Context.RLLP.name());
     }    
     
     /*******************************************************************************************************
@@ -693,16 +670,25 @@ public without sharing class RLLP_OppRollup {
                 }
             }                
         }
-        
-        update householdsToUpdate.values();
+
+        UTIL_DMLService.updateRecordBatchAndLogErrors(householdsToUpdate.values(), ERR_Handler_API.Context.RLLP.name());
     }  
     
     /*******************************************************************************************************
     * @description Runs opportunity soft credit rollups for contacts.
-    * @param cmap A map of contact IDs to contacts.
+    * @param list The list of contacts to rollup to.
     * @return void This method does updates directly and returns nothing.
     ********************************************************************************************************/
-    public void rollupSoftCredits(map<id, Contact> cmap){      
+    public void rollupSoftCreditsWithPartialSupport(list<Contact> listCon) {
+        RLLP_OppPartialSoftCreditRollup.rollupPartialSoftCredits(listCon);      
+    }
+    
+    /*******************************************************************************************************
+    * @description Runs opportunity soft credit rollups for contacts. 
+    * NO LONGER USED SINCE DOES NOT SUPPORT PARTIAL SOFT CREDITS.  Can be removed once we are done testing.
+    * @param cmap A map of contact IDs to contacts.
+    * @return void This method does updates directly and returns nothing.
+    public void rollupSoftCreditsOLDNoPartialSupport(map<id, Contact> cmap){      
         //arg used by multi currency for rollup field currencies
         map<Id,Opportunity> opptyCurrencies;
         // copy the contacts to a zeroed out version
@@ -760,6 +746,7 @@ public without sharing class RLLP_OppRollup {
         
         update contactsToUpdate.values();  
     }
+    ********************************************************************************************************/
        
     /*******************************************************************************************************
     * @description Runs all batch opportunity rollups for all records on all objects.
@@ -784,7 +771,8 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     public void rollupAllAccounts() {
         RLLP_OppAccRollup_BATCH batch = new RLLP_OppAccRollup_BATCH();
-        id batchProcessId = database.executeBatch(batch, RLLP_OppRollup_UTIL.BATCH_SIZE);        
+        id batchProcessId = database.executeBatch(batch, CRLP_RollupBatch_SVC.getBatchSize(
+                CRLP_RollupProcessingOptions.RollupType.AccountHardCredit, CRLP_RollupProcessingOptions.BatchJobMode.NonSkewMode));
     }
     /*******************************************************************************************************
     * @description Runs batch opportunity rollups for all contacts.
@@ -792,7 +780,8 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     public void rollupAllContacts() { 
         RLLP_OppContactRollup_BATCH batch = new RLLP_OppContactRollup_BATCH();
-        id batchProcessId = database.executeBatch(batch, RLLP_OppRollup_UTIL.BATCH_SIZE);        
+        id batchProcessId = database.executeBatch(batch, CRLP_RollupBatch_SVC.getBatchSize(
+                CRLP_RollupProcessingOptions.RollupType.ContactHardCredit, CRLP_RollupProcessingOptions.BatchJobMode.NonSkewMode));
     }
     /*******************************************************************************************************
     * @description Runs batch opportunity rollups for all households.
@@ -800,7 +789,8 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     public void rollupAllHouseholds(){
         RLLP_OppHouseholdRollup_BATCH batch = new RLLP_OppHouseholdRollup_BATCH();
-        id batchProcessId = database.executeBatch(batch, RLLP_OppRollup_UTIL.BATCH_SIZE);
+        id batchProcessId = database.executeBatch(batch, CRLP_RollupBatch_SVC.getBatchSize(
+                CRLP_RollupProcessingOptions.RollupType.AccountHardCredit, CRLP_RollupProcessingOptions.BatchJobMode.NonSkewMode));
     }
     /*******************************************************************************************************
     * @description Runs batch opportunity soft credit rollups for all contacts.
@@ -808,43 +798,46 @@ public without sharing class RLLP_OppRollup {
     ********************************************************************************************************/
     public void rollupAllSoftCredits(){
         RLLP_OppSoftCreditRollup_BATCH batch = new RLLP_OppSoftCreditRollup_BATCH();
-        id batchProcessId = database.executeBatch(batch, RLLP_OppRollup_UTIL.BATCH_SIZE);
+        id batchProcessId = database.executeBatch(batch, CRLP_RollupBatch_SVC.getBatchSize(
+                CRLP_RollupProcessingOptions.RollupType.ContactSoftCredit, CRLP_RollupProcessingOptions.BatchJobMode.NonSkewMode));
     }
     
     /*******************************************************************************************************
     * @description Method writes rollup fields from AggregateResults to an object needing rollups.
     * @param obj The object to roll up to.
-    * @param r The aggregate result object.
+    * @param aggrResultObj The aggregate result object.
     * @param opptyCurrencies Holds opportunity currency codes for multicurrency orgs.
     * @return void This method does updates directly and returns nothing.
     ********************************************************************************************************/
-    public static void updateRollupFromResult(sobject obj, sobject r, map<id, Opportunity> opptyCurrencies) {
+    public static void updateRollupFromResult(Sobject obj, Sobject aggrResultObj, Map<Id, Opportunity> opptyCurrencies) {
        // get the fiscal year, total amount, and opp count for this result row     
-        integer fy = (integer)(r.get('CalendarYr'));
-        decimal amt = (decimal)(r.get('TotalOppAmount'));
-        integer cnt = (integer)(r.get('NumberOfClosedOpps'));               
+        Integer fy = (integer)(aggrResultObj.get('CalendarYr'));
+        Decimal amt = (decimal)(aggrResultObj.get('TotalOppAmount'));
+        Integer cnt = (integer)(aggrResultObj.get('NumberOfClosedOpps'));
         
         // split the special field to get the last opp id and amount
-        string[] rcf = ((string)(r.get('RollupFieldset'))).split(';\\|;',-4);
-        decimal lastAmt = (rcf.size() > 1 && rcf[1] != '') ? decimal.valueOf(rcf[1]) : null;
+        String[] rcf = ((string)(aggrResultObj.get('RollupFieldset'))).split(';\\|;',-4);
+        Decimal lastAmt = (rcf.size() > 1 && rcf[1] != '') ? decimal.valueOf(rcf[1]) : null;
         
         // calculate amounts into correct currency if needed
         if(RLLP_OppRollup_UTIL.isMultiCurrency()){
-            amt = RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),amt);
-            if(lastAmt != null && rcf.size() > 4 && rcf[4] != '')
-                lastAmt = RLLP_OppRollup_UTIL.ConvertCurrency((string)opptyCurrencies.get((Id)rcf[4]).get('CurrencyISOCode'),(string)obj.get('CurrencyIsoCode'),lastAmt);           
+            amt = UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string)obj.get('CurrencyIsoCode'),amt);
+            if(lastAmt != null && rcf.size() > 4 && rcf[4] != '') {
+                lastAmt = UTIL_CurrencyConversion.convertAmountUsingStandardRates((string)opptyCurrencies.get((Id)rcf[4]).get('CurrencyISOCode'),(string)obj.get('CurrencyIsoCode'),lastAmt);
+            }
         }
         
         // check if this is an annual total or account total
         if (fy != null){
 
             // put the fiscal year total in the right fields
-            integer thisYear;
-            if (RLLP_OppRollup_UTIL.useFiscalYear)
+            Integer thisYear;
+            if (RLLP_OppRollup_UTIL.useFiscalYear) {
                 thisYear = RLLP_OppRollup_UTIL.getCurrentFY();
-            else
+            } else {
                 thisYear = system.today().year();
-            
+            }
+
             if (fy == thisYear){
                 obj.put('npo02__OppAmountThisYear__c', amt); 
                 obj.put('npo02__OppsClosedThisYear__c', cnt); 
@@ -856,38 +849,49 @@ public without sharing class RLLP_OppRollup {
             else if (fy == (thisYear - 2) ){
                 obj.put('npo02__OppAmount2YearsAgo__c', amt); 
                 obj.put('npo02__OppsClosed2YearsAgo__c', cnt); 
-            } 
-                
-        } 
-        else { 
+            }
+        } else {
             // fill in summary totals
             obj.put('npo02__TotalOppAmount__c', amt);
             obj.put('npo02__NumberOfClosedOpps__c', cnt);               
             obj.put('npo02__LastOppAmount__c', lastAmt);
-            obj.put('npo02__FirstCloseDate__c', r.get('FirstCloseDate')); //date
-            obj.put('npo02__LastCloseDate__c', r.get('LastCloseDate')); //date
+            obj.put('npo02__FirstCloseDate__c', aggrResultObj.get('FirstCloseDate')); //date
+            obj.put('npo02__LastCloseDate__c', aggrResultObj.get('LastCloseDate')); //date
             
             // calculate amounts into correct currency if needed
             if(RLLP_OppRollup_UTIL.isMultiCurrency()){
-               obj.put('npo02__AverageAmount__c', RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),(decimal)r.get('AverageAmount'))); 
-               obj.put('npo02__SmallestAmount__c', RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),(decimal)r.get('SmallestAmount'))); 
-               obj.put('npo02__LargestAmount__c', RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),(decimal)r.get('LargestAmount'))); 
+                String toCurrCode = (string)obj.get('CurrencyIsoCode');
+                obj.put('npo02__AverageAmount__c', UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates(toCurrCode,(decimal)aggrResultObj.get('AverageAmount')));
+                obj.put('npo02__SmallestAmount__c', UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates(toCurrCode,(decimal)aggrResultObj.get('SmallestAmount')));
+                obj.put('npo02__LargestAmount__c', UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates(toCurrCode,(decimal)aggrResultObj.get('LargestAmount')));
             }
             else{
-               obj.put('npo02__AverageAmount__c', (decimal)(r.get('AverageAmount'))); 
-               obj.put('npo02__SmallestAmount__c', (decimal)(r.get('SmallestAmount'))); 
-               obj.put('npo02__LargestAmount__c', (decimal)(r.get('LargestAmount'))); 
+               obj.put('npo02__AverageAmount__c', (decimal)(aggrResultObj.get('AverageAmount')));
+               obj.put('npo02__SmallestAmount__c', (decimal)(aggrResultObj.get('SmallestAmount')));
+               obj.put('npo02__LargestAmount__c', (decimal)(aggrResultObj.get('LargestAmount')));
             }
         }
         
-        //deal with user rollups
+        // Deal with user defined rollups
         if (RLLP_OppRollup_UTIL.urfsMap.size() > 0){
-            for (string s : RLLP_OppRollup_UTIL.urfsMap.keyset()){
-                if (obj.getSObjectType().getDescribe().getName() == RLLP_OppRollup_UTIL.urfsMap.get(s).npo02__Object_Name__c){
-                    npo02__User_Rollup_Field_Settings__c urfs = RLLP_OppRollup_UTIL.urfsMap.get(s);
-                    string x = urfs.Name;                   
-                    if (r.get(x) != null)
-                       obj.put(urfs.npo02__Target_Field__c, r.get(x));
+            // For each UDR
+            for (String s : RLLP_OppRollup_UTIL.urfsMap.keyset()){
+
+                // If the current rollup object matches the User Rollup Object
+                if (obj.getSObjectType().getDescribe().getName() == RLLP_OppRollup_UTIL.urfsMap.get(s).npo02__Object_Name__c) {
+                    npo02__User_Rollup_Field_Settings__c udr = RLLP_OppRollup_UTIL.urfsMap.get(s);
+                    String rollupName = udr.Name;
+
+                    // If there is an aggregate result for this UDR
+                    if (aggrResultObj.get(rollupName) != null) {
+                        // Calculate amounts into correct currency only if the field is a Currency type field
+                        Schema.DescribeFieldResult fld = UTIL_Describe.getFieldDescribe('Opportunity', udr.npo02__Source_Field__c);
+                        if (fld.getType() == Schema.Displaytype.Currency && RLLP_OppRollup_UTIL.isMultiCurrency()) {
+                            obj.put(udr.npo02__Target_Field__c, UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string) obj.get('CurrencyIsoCode'), (decimal) aggrResultObj.get(rollupName)));
+                        } else {
+                            obj.put(udr.npo02__Target_Field__c, aggrResultObj.get(rollupName));
+                        }
+                    }
                 }
             }
         } 
@@ -906,8 +910,9 @@ public without sharing class RLLP_OppRollup {
         integer cnt = (integer)(r.get('NumberOfClosedOpps'));               
         
         // calculate amounts into correct currency if needed
-        if(RLLP_OppRollup_UTIL.isMultiCurrency())
-           amt = RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),amt);
+        if(RLLP_OppRollup_UTIL.isMultiCurrency()) {
+            amt = UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string)obj.get('CurrencyIsoCode'),amt);
+        }
         
         obj.put('npo02__OppAmountLastNDays__c', amt);               
         obj.put('npo02__OppsClosedLastNDays__c', cnt);
@@ -934,21 +939,23 @@ public without sharing class RLLP_OppRollup {
         string lastMemberOrigin = (rcf.size() > 3) ? rcf[3] : null;
         // calculate amounts into correct currency if needed
         if(RLLP_OppRollup_UTIL.isMultiCurrency()){
-           amt = RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),amt);
-           if(lastAmt != null && rcf.size() > 4 && rcf[4] != '')
-               lastAmt = RLLP_OppRollup_UTIL.ConvertCurrency((string)opptyCurrencies.get((Id)rcf[4]).get('CurrencyISOCode'),(string)obj.get('CurrencyIsoCode'),lastAmt);           
+            amt = UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string)obj.get('CurrencyIsoCode'),amt);
+            if(lastAmt != null && rcf.size() > 4 && rcf[4] != '') {
+                lastAmt = UTIL_CurrencyConversion.convertAmountUsingStandardRates((string)opptyCurrencies.get((Id)rcf[4]).get('CurrencyISOCode'),(string)obj.get('CurrencyIsoCode'),lastAmt);
+            }
         }
 
         // fill in summary totals
         obj.put('npo02__TotalMembershipOppAmount__c', amt);
-        obj.put('npo02__NumberOfMembershipOpps__c', cnt);               
-        obj.put('npo02__LastMembershipDate__c', (date)(r.get('LastCloseDate')));                
-        obj.put('npo02__LastMembershipAmount__c', lastAmt);                 
-        obj.put('npo02__LastMembershipLevel__c', lastMemberLevel);              
-        obj.put('npo02__LastMembershipOrigin__c', lastMemberOrigin);                
-        obj.put('npo02__MembershipJoinDate__c', (date)(r.get('FirstStartDate'))); 
+        obj.put('npo02__NumberOfMembershipOpps__c', cnt);
+        obj.put('npo02__LastMembershipDate__c', (date)(r.get('LastCloseDate')));
+        obj.put('npo02__LastMembershipAmount__c', lastAmt);
+        obj.put('npo02__MembershipJoinDate__c', (date)(r.get('FirstStartDate')));
         obj.put('npo02__MembershipEndDate__c', (date)(r.get('LastEndDate')));
-    }   
+        // Force an empty string ("") to null to ensure the comparison to the db field matches.
+        obj.put('npo02__LastMembershipLevel__c', (String.isEmpty(lastMemberLevel) ? null : lastMemberLevel));
+        obj.put('npo02__LastMembershipOrigin__c', (String.isEmpty(lastMemberOrigin) ? null : lastMemberOrigin));
+    }
     
     /*******************************************************************************************************
     * @description Method writes soft credit rollup fields from AggregateResults to an object needing rollups.
@@ -956,7 +963,6 @@ public without sharing class RLLP_OppRollup {
     * @param r The aggregate result object.
     * @param opptyCurrencies Holds opportunity currency codes for multicurrency orgs.
     * @return void This method does updates directly and returns nothing.
-    ********************************************************************************************************/
     public static void updateSoftCreditFromResult(sobject obj, sobject r, map<id, Opportunity> opptyCurrencies){
          // get the fiscal year, total amount, and opp count for this result row     
         integer fy = (integer)(r.get('CalendarYr'));
@@ -964,7 +970,7 @@ public without sharing class RLLP_OppRollup {
         
         // calculate amounts into correct currency if needed
         if(RLLP_OppRollup_UTIL.isMultiCurrency())
-            amt = RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),amt);
+            amt = UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string)obj.get('CurrencyIsoCode'),amt);
         
         // check if this is an annual total or account total
         if (fy != null){
@@ -990,6 +996,7 @@ public without sharing class RLLP_OppRollup {
             obj.put('npo02__Soft_Credit_Total__c', amt);        
         }
     }
+    ********************************************************************************************************/
 
      /*******************************************************************************************************
     * @description Method writes soft credit last N days rollup fields from AggregateResults to an object 
@@ -997,7 +1004,6 @@ public without sharing class RLLP_OppRollup {
     * @param obj The object to roll up to.
     * @param r The aggregate result object.
     * @return void This method does updates directly and returns nothing.
-    ********************************************************************************************************/
    public static void updateSoftCreditRollupFromResultLastNDays(sobject obj, sobject r){
            
         // get the total amount for this result row     
@@ -1005,8 +1011,9 @@ public without sharing class RLLP_OppRollup {
         
         // calculate amounts into correct currency if needed
         if(RLLP_OppRollup_UTIL.isMultiCurrency())
-           amt = RLLP_OppRollup_UTIL.ConvertFromCorporate((string)obj.get('CurrencyIsoCode'),amt);
+           amt = UTIL_CurrencyConversion.convertFromCorporateUsingStandardRates((string)obj.get('CurrencyIsoCode'),amt);
         
         obj.put('Soft_Credit_Last_N_Days__c', amt);               
     }
+    ********************************************************************************************************/
 }

@@ -34,33 +34,31 @@
 * @group-content ../../ApexDocContent/Rollups.htm
 * @description Batch class for opportunity account rollups. 
 */
-public class RLLP_OppAccRollup_BATCH implements Database.Batchable<SObject>, UTIL_MasterSchedulableHelper.UTIL_IRecurring {
-		
+public class RLLP_OppAccRollup_BATCH implements Database.Batchable<SObject>, Schedulable {
+
+    /** @description Instantiates RLLP_OppRollup_UTIL */
+    RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
+
     /*******************************************************************************************************
-    * @description Implementation of UTIL_MasterSchedulableHelper.UTIL_IRecurring, to allow nightly 
-    * scheduling. Attempts to start allocations rollup batch job.
-    * @return Boolean Whether the batch job started successfully. 
+    * @description Schedulable execute method executes this batch job.
     ********************************************************************************************************/
-	public Boolean executeReturnStatus() {
-        if(UTIL_JobScheduler.canRunBatch()) {
-        	Savepoint sp = Database.setSavepoint();
-        	try {
-                Database.executeBatch(this);
-                return true;
-        	} catch(Exception e) {
-	            Database.rollback(sp);
-	            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
-	        }
+    public void execute(SchedulableContext context) {
+        try {
+            if (RLLP_OppRollup_UTIL.customizableRollupEngineEnabled == false) {
+                Database.executeBatch(new RLLP_OppAccRollup_BATCH(), CRLP_RollupBatch_SVC.getBatchSize(
+                        CRLP_RollupProcessingOptions.RollupType.AccountHardCredit, CRLP_RollupProcessingOptions.BatchJobMode.NonSkewMode));
+            }
+        } catch(Exception e) {
+            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
         }
-        return false;
     }
     
     /*******************************************************************************************************
-    * @description Batch start method, instantiates RLLP_OppRollup_UTIL and builds query for account rollups.
+    * @description Batch start method and builds query for account rollups.
     ********************************************************************************************************/
-	public database.Querylocator start(Database.BatchableContext bc) {
-        RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
-        String acctQuery = oppRollupUtil.buildAccountQuery();        
+    public database.Querylocator start(Database.BatchableContext bc) {
+        RLLP_OppRollup_UTIL.setupUserRollupVars();
+        String acctQuery = oppRollupUtil.buildAccountQuery();
         return Database.getQueryLocator(acctQuery);
     }
     
@@ -73,7 +71,7 @@ public class RLLP_OppAccRollup_BATCH implements Database.Batchable<SObject>, UTI
         // exception percolate up the call stack, then the batch will think it all succeeded.
         // but if we were to log it, and then propagate the exception, the transaction will 
         // get rolled back, and the logging will be erased!
-        RLLP_OppRollup oppRoller = new RLLP_OppRollup();        
+        RLLP_OppRollup oppRoller = new RLLP_OppRollup();
         oppRoller.RollupAccounts(new Map<id, Account>((List<Account>)result));    
     }
 

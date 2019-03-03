@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObjectTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <caseValues>
+        <plural>false</plural>
+        <value><!-- GAU Allocation --></value>
+    </caseValues>
+    <caseValues>
+        <plural>true</plural>
+        <value><!-- GAU Allocation --></value>
+    </caseValues>
+    <fields>
+        <help>Bedrag van de Opportunity wat toegewezen moet worden aan deze Bestemming. Laat leeg voor procent gebaseerde Toewijzingen.</help>
+        <label>Bedrag</label>
+        <name>Amount__c</name>
+    </fields>
+    <fields>
+        <help>Optioneel toeschrijven van Toewijzingen aan een Campagne. Alle nieuwe Opportunities met deze Campagne als Primaire Campagne Bron zal automatisch toegewezen worden op dezelfde manier.</help>
+        <label>Campagne</label>
+        <name>Campaign__c</name>
+        <relationshipLabel>Bestemming Toewijzingen</relationshipLabel>
+    </fields>
+    <fields>
+        <help>De Bestemming voor deze Toewijzing. Alleen Bestemmingen die gemarkeerd zijn als actief zijn beschikbaar voor nieuwe Toewijzingen.</help>
+        <label>Bestemming</label>
+        <lookupFilter>
+            <errorMessage>Toewijzingen kunnen alleen worden toegewezen aan actieve Bestemmingen. Toewijzingen toegewezen aan inactieve Bestemmingen kunnen niet worden aangepast.</errorMessage>
+            <informationalMessage>Alleen actieve Bestemmingen kunnen worden geselecteerd.</informationalMessage>
+        </lookupFilter>
+        <name>General_Accounting_Unit__c</name>
+        <relationshipLabel>Bestemming Toewijzingen</relationshipLabel>
+    </fields>
+    <fields>
+        <help>Toeschrijven van Toewijzingen aan een Opportunity. Alle Opportunities in een Gesloten/Gewonnen fase zullen worden toegewezen aan deze Bestemming.</help>
+        <label><!-- Opportunity --></label>
+        <name>Opportunity__c</name>
+        <relationshipLabel>Bestemming Toewijzingen</relationshipLabel>
+    </fields>
+    <fields>
+        <help>Percentage van het Opportunity bedrag dat toegewezen wordt aan deze Bestemming. Wijzigen van een Opportunity Bedrag die op percentage is toegewezen zal ook het Toewijzing Bedrag wijzigen.</help>
+        <label>Percentage</label>
+        <name>Percent__c</name>
+    </fields>
+    <fields>
+        <help>Optioneel toeschrijven van Toewijzingen aan een Terugkerende Donatie. Alle nieuwe Opportunities met dit Terugkerende Donatie schema zullen automatisch toegewezen worden op dezelfde manier.</help>
+        <label>Terugkerende Donatie</label>
+        <name>Recurring_Donation__c</name>
+        <relationshipLabel>Bestemming Toewijzingen</relationshipLabel>
+    </fields>
+    <gender><!-- Neuter --></gender>
+    <layouts>
+        <layout>Allocation Layout</layout>
+        <sections>
+            <label>Aangepaste Koppelingen</label>
+            <section>Custom Links</section>
+        </sections>
+    </layouts>
+    <nameFieldLabel><!-- GAU Allocation Name --></nameFieldLabel>
+    <webLinks>
+        <label>Beheer Toewijzingen</label>
+        <name>Manage_Allocations</name>
+    </webLinks>
+</CustomObjectTranslation>

@@ -46,8 +46,10 @@ public class ADDR_Account_TDTM extends TDTM_Runnable {
     ********************************************************************************************************/
     public override DmlWrapper run(List<SObject> listNew, List<SObject> listOld, 
         TDTM_Runnable.Action triggerAction, Schema.DescribeSObjectResult objResult) {
-            
-        DmlWrapper dmlWrapper = new DmlWrapper();  
+
+        //UTIL_Debug.debug('DJH**** ADDR_Account_TDTM ' + triggerAction + ' hasRun: ' + ADDR_Addresses_TDTM.cHasRunAddrTrigger);
+
+        DmlWrapper dmlWrapper = new DmlWrapper();
         list<Account> listAccCreateAddr = new list<Account>();      
        
         integer i = -1;        
@@ -80,8 +82,11 @@ public class ADDR_Account_TDTM extends TDTM_Runnable {
                 Account accOld = (Account)listOld[i];
                 // note that we detect whether the address change is coming from the address trigger,
                 // in which case we don't want to create a new address.
-                if (ADDR_Addresses_TDTM.hasRunAddrTrigger)
+                if (TDTM_ProcessControl.isRecursive(TDTM_ProcessControl.flag.ADDR_hasRunTrigger)) {
+                    //UTIL_Debug.debug('DJH**** stop Addr Trigger recursion in ADDR_Account_TDTM');
                     continue;
+                    
+                }
                 // we only support address management with HH Accounts and Organizational Accounts (if enabled)
                 if ((acc.npe01__SYSTEM_AccountType__c == CAO_Constants.HH_ACCOUNT_TYPE && 
                 		!UTIL_CustomSettingsFacade.getContactsSettings().Household_Account_Addresses_Disabled__c) ||

@@ -30,37 +30,49 @@
 /**
 * @author Salesforce.org
 * @date 2014
+* @group Rollups
+* @group-content ../../ApexDocContent/Rollups.htm
 * @description Batch class for opportunity soft credit rollups. 
 */
-public class RLLP_OppSoftCreditRollup_BATCH implements Database.Batchable<SObject>, UTIL_MasterSchedulableHelper.UTIL_IRecurring {
-		    
-	public Boolean executeReturnStatus() {
-        if(UTIL_JobScheduler.canRunBatch()) {
-        	Savepoint sp = Database.setSavepoint();
-            try {
-	            Database.executeBatch(this);  
-	            return true;
-            } catch(Exception e) {
-                Database.rollback(sp);
-                ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
-            }
+public class RLLP_OppSoftCreditRollup_BATCH implements Database.Batchable<SObject>, Schedulable {
+
+    /** @description Instantiates RLLP_OppRollup_UTIL */
+    RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
+
+    /*******************************************************************************************************
+    * @description Schedulable execute method executes this batch job.
+    ********************************************************************************************************/
+    public void execute(SchedulableContext context) {
+        try {
+            Database.executeBatch(new RLLP_OppSoftCreditRollup_BATCH(), CRLP_RollupBatch_SVC.getBatchSize(
+                    CRLP_RollupProcessingOptions.RollupType.ContactSoftCredit, CRLP_RollupProcessingOptions.BatchJobMode.NonSkewMode));
+        } catch(Exception e) {
+            ERR_Handler.processError(e, ERR_Handler_API.Context.RLLP);
         }
-        return false;
     }
     
-	public database.Querylocator start(Database.BatchableContext bc) {
-        RLLP_OppRollup_UTIL oppRollupUtil = new RLLP_OppRollup_UTIL();
+    /*******************************************************************************************************
+    * @description Batch start method and builds query for household rollups.
+    ********************************************************************************************************/
+    public database.Querylocator start(Database.BatchableContext bc) {
         return Database.getQueryLocator(oppRollupUtil.buildContactQuery());      
     }
     
+    /*******************************************************************************************************
+    * @description Batch execute method, instantiates RLLP_OppRollup_UTIL and runs rollups for current 
+    * batch of households.
+    ********************************************************************************************************/
     public void execute(Database.BatchableContext bc, List<Contact> result) {
         // NOTE: we don't capture exception and log errors here, because if we don't let the 
         // exception percolate up the call stack, then the batch will think it all succeeded.
         // but if we were to log it, and then propagate the exception, the transaction will 
         // get rolled back, and the logging will be erased!
         RLLP_OppRollup oppRoller = new RLLP_OppRollup();
-        oppRoller.RollupSoftCredits(new Map<id, Contact>((List<Contact>)result));
+        oppRoller.RollupSoftCreditsWithPartialSupport(result);
     }
 
+    /*******************************************************************************************************
+    * @description Batch finish method, does nothing.
+    ********************************************************************************************************/
     public void finish(Database.BatchableContext bc) {}
 }

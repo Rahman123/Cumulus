@@ -52,7 +52,7 @@ public with sharing class STG_PanelOppNaming_CTRL extends STG_Panel {
     public map<string,Opportunity_Naming_Settings__c> mapOppNameSettings {
         get {
             if (mapOppNameSettings==null)
-                mapOppNameSettings = Opportunity_Naming_Settings__c.getAll();
+                mapOppNameSettings = UTIL_ListCustomSettingsFacade.getMapOppNamingSettings();
             return mapOppNameSettings;
         }
         set;
@@ -62,14 +62,12 @@ public with sharing class STG_PanelOppNaming_CTRL extends STG_Panel {
     * @description A list of all Opportunity Naming Settings for display on the page. Replaces blank Name 
     * Formats with  "- do not rename-" and blank Record Types with '- all record types -'
     */
-    public list<Opportunity_Naming_Settings__c> listOppNameSettings {
+    public List<OpportunityNamingSetting> listOppNameSettings {
         get {
-            listOppNameSettings = mapOppNameSettings.values().deepClone();
-            for (Opportunity_Naming_Settings__c ons : listOppNameSettings) {
-                if (string.isBlank(ons.Opportunity_Name_Format__c))
-                    ons.Opportunity_Name_Format__c = Label.stgLabelDoNotRename;
-                if (string.isBlank(ons.Opportunity_Record_Types__c))
-                    ons.Opportunity_Record_Types__c = Label.stgLabelAllRecordTypes;
+            listOppNameSettings = new List<OpportunityNamingSetting>();
+            List<Opportunity_Naming_Settings__c> oppNameSettings = mapOppNameSettings.values().deepClone();
+            for (Opportunity_Naming_Settings__c ons : oppNameSettings) {
+                listOppNameSettings.add(new OpportunityNamingSetting(ons));
             }
             return listOppNameSettings;
         }
@@ -79,9 +77,7 @@ public with sharing class STG_PanelOppNaming_CTRL extends STG_Panel {
     /*********************************************************************************************************
     * @description The panel's constructor 
     */
-    public STG_PanelOppNaming_CTRL() {
-        isRunningBatch = false;
-    }
+    public STG_PanelOppNaming_CTRL() {}
         
     /*********************************************************************************************************
     * @description Returns the string Id of the Households panel. 
@@ -89,17 +85,12 @@ public with sharing class STG_PanelOppNaming_CTRL extends STG_Panel {
     public override string idPanel() { return 'idPanelOppNaming'; }
 
     /*********************************************************************************************************
-    * @description Whether we are running the batch opportunity naming process 
-    */
-    public boolean isRunningBatch { get; set; }
-
-    /*********************************************************************************************************
     * @description Action Method to delete a specific settings instance.
     * @return null 
     */
     public PageReference delONS() {
         delete mapOppNameSettings.get(currentONSName);
-        mapOppNameSettings = Opportunity_Naming_Settings__c.getAll();
+        mapOppNameSettings = UTIL_ListCustomSettingsFacade.getMapOppNamingSettings();
         return null;
     }
 
@@ -133,20 +124,9 @@ public with sharing class STG_PanelOppNaming_CTRL extends STG_Panel {
     public PageReference saveONS() {
         if (isValidNameFormats()) {
             upsert currentONS;
-            mapOppNameSettings = Opportunity_Naming_Settings__c.getAll();
+            mapOppNameSettings = UTIL_ListCustomSettingsFacade.getMapOppNamingSettings();
             super.cancelEdit();
         }
-        return null;
-    }
-
-    /*********************************************************************************************************
-    * @description Action Method to run batch opportunity renaming.
-    * @return null 
-    */
-    public PageReference runBatch() {
-        isRunningBatch = true;
-        OPP_OpportunityNaming_BATCH batch = new OPP_OpportunityNaming_BATCH();
-        id batchProcessId = database.executeBatch(batch, 200);
         return null;
     }
     
@@ -216,5 +196,24 @@ public with sharing class STG_PanelOppNaming_CTRL extends STG_Panel {
             return listSOOpportunityAttribution;
         }
         private set;
+    }
+
+    public class OpportunityNamingSetting {
+        public Opportunity_Naming_Settings__c so { get; set; }
+        public String oppRecordTypesString { get; set; }
+        public String nameFormatString { get; set; }
+        public OpportunityNamingSetting(Opportunity_Naming_Settings__c ons) {
+            this.so = ons;
+            this.oppRecordTypesString = STG_Panel.getRecordTypeNamesFromPicklistString(
+                Opportunity.sObjectType,
+                ons.Opportunity_Record_Types__c,
+                Label.stgLabelAllRecordTypes
+            );
+            if (string.isBlank(ons.Opportunity_Name_Format__c)) {
+                this.nameFormatString = Label.stgLabelDoNotRename;
+            } else {
+                this.nameFormatString = ons.Opportunity_Name_Format__c;
+            }
+        }
     }
 }

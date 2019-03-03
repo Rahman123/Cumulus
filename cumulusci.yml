@@ -1,0 +1,339 @@
+project:
+    name: Cumulus
+    package:
+        name: Cumulus
+        name_managed: Nonprofit Success Pack
+        namespace: npsp
+        api_version: 43.0
+        install_class: STG_InstallScript
+        uninstall_class: STG_UninstallScript
+    git:
+        repo_url: https://github.com/SalesforceFoundation/Cumulus
+        prefix_beta: uat/
+        prefix_release: rel/
+    apexdoc:
+        homepage: ApexDocContent/homepage.htm
+        banner: ApexDocContent/projectheader.htm
+        branch: gh-pages
+        repo_dir: ApexDocumentation
+    dependencies:
+        # npo02 (includes npe01)
+        - github: https://github.com/SalesforceFoundation/Households
+        # npe03
+        - github: https://github.com/SalesforceFoundation/Recurring_Donations
+        # npe4
+        - github: https://github.com/SalesforceFoundation/Relationships
+        # npe5
+        - github: https://github.com/SalesforceFoundation/Affiliations
+
+tasks:
+    download_ldv_tests:
+        description: Downloads the NPSP-LDV-Tests repository
+        class_path: cumulusci.tasks.util.DownloadZip
+        options:
+            dir: ldv_tests
+            subfolder: Cumulus-LDV-Tests-master
+            url: 'https://github.com/SalesforceFoundation/Cumulus-LDV-Tests/archive/master.zip'
+
+    deploy_ldv_tests:
+        description: Deploy the LDV-Tests repo to your org.
+        class_path: cumulusci.tasks.salesforce.Deploy
+        options:
+            path: ldv_tests/src
+        
+    deploy_dev_config:
+        description: Deploys the post-install configuration for an unmanaged DE org
+        class_path: cumulusci.tasks.salesforce.Deploy
+        options:
+            path: unpackaged/config/dev
+
+    deploy_trial_config:
+        description: Deploys the post-install configuration for a trial/new org.
+        class_path: cumulusci.tasks.salesforce.Deploy
+        options:
+            path: unpackaged/config/trial
+            namespace_inject: $project_config.project__package__namespace
+
+    deploy_qa_config:
+        description: Deploys additional fields used for QA purposes only
+        class_path: cumulusci.tasks.salesforce.Deploy
+        options:
+            path: unpackaged/config/qa
+
+    deploy_dev_config_delete:
+        description: Deploys the metadata deletions for the post-install DE org config
+        class_path: cumulusci.tasks.salesforce.Deploy
+        options:
+            path: unpackaged/config/delete
+
+    robot_libdoc:
+        options:
+            path: tests/NPSP.py,tests/NPSP.robot
+            output: tests/Keywords.html
+            
+    update_admin_profile:
+        options:
+            package_xml: lib/admin_profile.xml
+            record_types:
+                - record_type: Account.HH_Account
+                - record_type: Account.Organization
+                  default: true
+                  person_account_default: true
+                - record_type: Opportunity.NPSP_Default
+                  default: true
+
+    pmd:
+        description: Run Apex code analysis with PMD. This task assumes that PMD is available in PATH. On MacOS PMD is available to install in brew.
+        class_path: tasks.pmd.PMDTask
+        options:
+            path: 'src/classes'
+            output: text
+            runAllApex: False
+            htmlfilename: 'pmd.html'
+
+    test_data_dev_org:
+        description: 'Loads a test data set for most NPSP objects based on 100 Contacts that should fit into a scratch org or DE org'
+        class_path: cumulusci.tasks.bulkdata.LoadData
+        options:
+            database_url: 'sqlite:///testdata/dev_org/test_data.db'
+            mapping: 'testdata/mapping.yml'
+
+    test_data_1k:
+        description: 'Loads a test data set for most NPSP objects based on 1024 Contacts'
+        class_path: cumulusci.tasks.bulkdata.LoadData
+        options:
+            database_url: 'sqlite:///testdata/1k/test_data.db'
+            mapping: 'testdata/mapping.yml'
+
+    test_data_100k:
+        description: 'Loads a test data set for most NPSP objects based on 102400 Contacts.  NOTE: The sqlite data set is not included in the repo for this task so you need to load it into the correct filesystem location'
+        class_path: cumulusci.tasks.bulkdata.LoadData
+        options:
+            database_url: 'sqlite:///testdata/100k/test_data.db'
+            mapping: 'testdata/mapping.yml'
+
+    test_data_delete:
+        description: 'WARNING: Deletes all data in the objects specified in the objects option.'
+        class_path: cumulusci.tasks.bulkdata.DeleteData
+        options:
+            objects:
+                - Opportunity
+                - npe03__Recurring_Donation__c
+                - Case
+                - Contact
+                - Account
+                - Allocation__c
+                - General_Accounting_Unit__c
+                - Campaign
+
+    test_data_relationships:
+        description: 'Runs execute anonymous to insert the default relationships'
+        class_path: cumulusci.tasks.apex.anon.AnonymousApexTask
+        options:
+            apex: >
+                List<npe4__Relationship_Lookup__c> defaultRelationships = new List<npe4__Relationship_Lookup__c>{
+                    new npe4__Relationship_Lookup__c(Name = 'Father',npe4__Male__c = 'Son', npe4__Female__c = 'Daughter', npe4__Neutral__c = 'Child'),
+                    new npe4__Relationship_Lookup__c(Name = 'Mother',npe4__Male__c = 'Son', npe4__Female__c = 'Daughter', npe4__Neutral__c = 'Child'),
+                    new npe4__Relationship_Lookup__c(Name = 'Parent',npe4__Male__c = 'Son', npe4__Female__c = 'Daughter', npe4__Neutral__c = 'Child'),
+                    new npe4__Relationship_Lookup__c(Name = 'Son',npe4__Male__c = 'Father', npe4__Female__c = 'Mother', npe4__Neutral__c = 'Parent'),
+                    new npe4__Relationship_Lookup__c(Name = 'Daughter',npe4__Male__c = 'Father', npe4__Female__c = 'Mother', npe4__Neutral__c = 'Parent'),
+                    new npe4__Relationship_Lookup__c(Name = 'Child',npe4__Male__c = 'Father', npe4__Female__c = 'Mother', npe4__Neutral__c = 'Parent'),
+                    new npe4__Relationship_Lookup__c(Name = 'Aunt',npe4__Male__c = 'Nephew', npe4__Female__c = 'Niece', npe4__Neutral__c = 'Sibling\'s Child'),
+                    new npe4__Relationship_Lookup__c(Name = 'Uncle',npe4__Male__c = 'Nephew', npe4__Female__c = 'Niece', npe4__Neutral__c = 'Sibling\'s Child'),
+                    new npe4__Relationship_Lookup__c(Name = 'Husband',npe4__Male__c = 'Husband', npe4__Female__c = 'Wife', npe4__Neutral__c = 'Spouse'),
+                    new npe4__Relationship_Lookup__c(Name = 'Wife',npe4__Male__c = 'Husband', npe4__Female__c = 'Wife', npe4__Neutral__c = 'Spouse'),
+                    new npe4__Relationship_Lookup__c(Name = 'Partner',npe4__Male__c = 'Partner', npe4__Female__c = 'Partner', npe4__Neutral__c = 'Partner'),
+                    new npe4__Relationship_Lookup__c(Name = 'Cousin',npe4__Male__c = 'Cousin', npe4__Female__c = 'Cousin', npe4__Neutral__c = 'Cousin'),
+                    new npe4__Relationship_Lookup__c(Name = 'Grandmother',npe4__Male__c = 'Grandson', npe4__Female__c = 'Granddaughter', npe4__Neutral__c = 'Grandchild'),
+                    new npe4__Relationship_Lookup__c(Name = 'Grandfather',npe4__Male__c = 'Grandson', npe4__Female__c = 'Granddaughter', npe4__Neutral__c = 'Grandchild'),
+                    new npe4__Relationship_Lookup__c(Name = 'Grandparent',npe4__Male__c = 'Grandson', npe4__Female__c = 'Granddaughter', npe4__Neutral__c = 'Grandchild'),
+                    new npe4__Relationship_Lookup__c(Name = 'Grandson',npe4__Male__c = 'Grandfather', npe4__Female__c = 'Grandmother', npe4__Neutral__c = 'Grandparent'),
+                    new npe4__Relationship_Lookup__c(Name = 'Granddaughter',npe4__Male__c = 'Grandfather', npe4__Female__c = 'Grandmother', npe4__Neutral__c = 'Grandparent'),
+                    new npe4__Relationship_Lookup__c(Name = 'Grandchild',npe4__Male__c = 'Grandfather', npe4__Female__c = 'Grandmother', npe4__Neutral__c = 'Grandparent'),
+                    new npe4__Relationship_Lookup__c(Name = 'Employer',npe4__Male__c = 'Employee', npe4__Female__c = 'Employee', npe4__Neutral__c = 'Employee'),
+                    new npe4__Relationship_Lookup__c(Name = 'Employee',npe4__Male__c = 'Employer', npe4__Female__c = 'Employer', npe4__Neutral__c = 'Employer')
+                };
+                insert defaultRelationships;
+
+
+    test_data_delete_managed:
+        description: 'WARNING: Deletes all data in the objects specified in the objects option.'
+        class_path: cumulusci.tasks.bulkdata.DeleteData
+        options:
+            objects:
+                - Opportunity
+                - npe03__Recurring_Donation__c
+                - Case
+                - Contact
+                - Account
+                - npsp__Allocation__c
+                - npsp__General_Accounting_Unit__c
+                - Campaign
+
+    npsp_default_settings:
+        description: Configure the default NPSP Settings including Membership RecordType
+        class_path: cumulusci.tasks.apex.anon.AnonymousApexTask
+        options:
+            path: scripts/configure_npsp_default_settings.cls
+            apex: initializeNPSPSettings();
+
+    enable_customizable_rollups:
+        description: Enable the NPSP Customizable Rollups feature
+        class_path: cumulusci.tasks.apex.anon.AnonymousApexTask
+        options:
+            apex: new STG_PanelCustomizableRollup_CTRL().enableCRLPs();
+
+    add_second_currency:
+        description: Add CAD as a 2nd currency for a multicurrency org
+        class_path: tasks.multicurrency.ConfigureCAD
+
+    uninstall_packaged_incremental:
+        description: Deletes any metadata from the package in the target org not in the local workspace
+        class_path: cumulusci.tasks.salesforce.UninstallPackagedIncremental
+        options:
+            ignore:
+                QuickAction:
+                    - NewEvent
+                    - NewCase
+                    - SendEmail
+                # Unpackaged lightning record pages added by trial config
+                FlexiPage:
+                    - NPSP_Address_Record_Page
+                    - NPSP_Deliverable
+                    - NPSP_Engagement_Plan_Record_Page
+                    - NPSP_GAU_Allocation
+                    - NPSP_General_Accounting_Unit
+
+flows:
+    config_dev:
+        steps:
+            3:
+                task: deploy_dev_config_delete
+            4:
+                task: deploy_dev_config
+            5:
+                task: npsp_default_settings
+
+    config_qa:
+        steps:
+            2:
+                task: None
+            3:
+                task: deploy_dev_config_delete
+            4:
+                task: deploy_trial_config
+            5:
+                task: npsp_default_settings
+            6:
+                task: deploy_qa_config
+            7:
+                task: update_admin_profile
+            8:
+                task: test_data_relationships
+
+    config_acctsc_rollups:
+        description: 'Deploys custom fields and rollups for testing account soft credits.'
+        steps:
+            1:
+                task: enable_customizable_rollups
+            2:
+                task: deploy
+                options:
+                    path: unpackaged/config/acctsc_rollups
+            3:
+                task: update_admin_profile
+
+    release_beta:
+        steps:
+            5:
+                task: mrbelvedere_publish
+                options:
+                    tag: ^^github_release.tag_name
+
+    config_managed:
+        steps:
+            2:
+                task: deploy_dev_config_delete
+            3:
+                task: deploy_trial_config
+                options:
+                    unmanaged: False
+            4:
+                task: update_admin_profile
+                options:
+                    managed: true
+
+    config_offsetfiscal:
+        description: 'Configure an offset fiscal year'
+        steps:
+            1:
+                task: deploy
+                options:
+                    path: unpackaged/config/offsetfiscal
+
+    config_multicurrency:
+        description: 'Configure a second currency'
+        steps:
+            1:
+                task: add_second_currency
+
+    test_data_dev_org:
+        description: 'WARNING: This flow deletes all data first, then loads the complete test data set based on 100 Contacts into the target org.'
+        steps:
+            1:
+                task: test_data_delete
+            2:
+                task: test_data_dev_org
+
+    test_data_dev_org_managed:
+        description: 'WARNING: This flow deletes all data first, then loads the complete test data set based on 100 Contacts into the target org.'
+        steps:
+            1:
+                task: test_data_delete_managed
+            2:
+                task: test_data_dev_org
+                options:
+                    mapping: testdata/mapping_managed.yml
+
+    test_data_1k:
+        description: 'WARNING: This flow deletes all data first, then loads the complete test data set based on 1,024 Contacts into the target org.'
+        steps:
+            1:
+                task: test_data_delete
+            2:
+                task: test_data_1k
+
+    ldv_tests:
+        description: 'Deploys and runs LDV tests'
+        steps:
+            1:
+                task: download_ldv_tests
+            2:
+                task: deploy_ldv_tests
+            3:
+                task: run_tests
+                options:
+                    test_name_match: LDV_%
+
+orgs:
+    scratch:
+        dev_namespaced:
+            config_file: orgs/dev.json
+            namespaced: True
+        beta_middlesuffix:
+            config_file: orgs/beta_middlesuffix.json
+        beta_multicurrency:
+            config_file: orgs/beta_multicurrency.json
+        beta_personaccounts:
+            config_file: orgs/beta_personaccounts.json
+        beta_statecountry:
+            config_file: orgs/beta_statecountry.json
+        beta_wave:
+            config_file: orgs/beta_wave.json
+        prerelease:
+            config_file: orgs/prerelease.json
+        trial:
+            config_file: orgs/trial.json
+        enterprise:
+            config_file: orgs/enterprise.json
+

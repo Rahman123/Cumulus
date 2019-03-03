@@ -133,18 +133,18 @@ public with sharing class HH_NameSpec implements HH_INaming {
         private integer cMaxUseOverrun { get; set; }
         private string strHNSField { get; set; }
         
-	    /*******************************************************************************************************
-	    * @description NameSpec Constructor
-	    * @param hns An instance of Household Naming Settings to use.
-	    * @param strField The namespec field in Settings to use.
-	    */
+        /*******************************************************************************************************
+        * @description NameSpec Constructor
+        * @param hns An instance of Household Naming Settings to use.
+        * @param strField The namespec field in Settings to use.
+        */
         private NameSpec(Household_Naming_Settings__c hns, string strField) {
-        	strHNSField = strField; 
-        	string strNameSpec = string.valueOf(hns.get(strField));
-        	strAnd = hns.Name_Connector__c;
-        	strOverrun = hns.Name_Overrun__c;
-        	cMaxUseOverrun = integer.valueOf(hns.Contact_Overrun_Count__c);
-        	parseNameSpec(strNameSpec);
+            strHNSField = strField; 
+            string strNameSpec = string.valueOf(hns.get(strField));
+            strAnd = (hns.Name_Connector__c == null ? ' ' : ' ' + hns.Name_Connector__c + ' ');
+            strOverrun = hns.Name_Overrun__c;
+            cMaxUseOverrun = integer.valueOf(hns.Contact_Overrun_Count__c);
+            parseNameSpec(strNameSpec);
         }
         
         /*******************************************************************************************************
@@ -178,13 +178,15 @@ public with sharing class HH_NameSpec implements HH_INaming {
                 strNameSpec = strNameSpec.left(ich+1);
             }
             
-            // look for the FirstNameSpec by removing any {LastName} field references
-            string str = strNameSpec.replace(chLToken + 'LastName' + chRToken, '');
+            // extract FirstNameSpec
+            string str = strFNameSpecFromStrNameSpec(strNameSpec);
+
+            // replace the firstnamespec with a token in our fullnamespec
             ich = str.indexOf(chLToken);
             integer ichR = str.lastIndexOf(chRToken);
             if (ich >= 0 && ichR > 0) {
+                strFullNameSpec = strNameSpec.replace(str, 'FirstNameSpec');
                 strFirstNameSpec = str.substring(ich + chLToken.length(), ichR);
-                strFullNameSpec = strNameSpec.replace(strFirstNameSpec, 'FirstNameSpec');
             } else {
                 strFullNameSpec = strNameSpec;
             }
@@ -198,11 +200,12 @@ public with sharing class HH_NameSpec implements HH_INaming {
             set<string> setStrField = new set<string>();
             if (strFirstNameSpec != null)
                 setStrField.addAll(setStrFieldFromStrFSpec(strFirstNameSpec));
+            if (strFullNameSpec != null)
+                setStrField.addAll(setStrFieldFromStrFSpec(strFullNameSpec));
             setStrField.add('LastName');    
             return setStrField;
         }
     }
-    
     
     /*******************************************************************************************************
     * @description Given a namespec and a list of Contacts (assumed from a single household),
@@ -213,59 +216,102 @@ public with sharing class HH_NameSpec implements HH_INaming {
     * return string
     */
     private static string strNameFromNameSpec(NameSpec ns, list<Contact> listCon) {
-        string strName = '';
-        integer cCon = listCon.size();          
-        integer i = 0;
-        boolean isNoLastnames = (ns.strFullNameSpec.indexOf(chLToken + 'LastName' + chRToken) == -1);
+        Integer cCon = listCon.size();    
+        Boolean isNoLastnames = ns.strFullNameSpec.toUpperCase().indexOf(chLToken + 'LASTNAME' + chRToken) == -1;
+        Boolean isLastNameOnlyFormat = !isNoLastnames && ns.setStrFieldsInNameSpec().size() == 1;
+        Set<String> processedLastNames = new Set<String>();
+        String[] names = new String[0];
         
         if (cCon == 0) {
-        	if (ns.strHNSField == 'Household_Name_Format__c')
-        	   strName = label.npo02.HouseholdAnonymousName;
-            else 
-        	   strName = label.npo02.HouseholdAnonymousGreeting;
+            names.add(
+                ns.strHNSField == 'Household_Name_Format__c'
+                    ? label.npo02.HouseholdAnonymousName
+                    : label.npo02.HouseholdAnonymousGreeting
+            );
         }
         
-        while (i < cCon && i < ns.cMaxUseOverrun) {
+        for (Integer i = 0, next = 0; i < cCon && i < ns.cMaxUseOverrun; i = next) {
+            String strLname = listCon[i].LastName;
+            next = i + 1;
+
+            if (isLastNameOnlyFormat && processedLastNames.contains(strLname)) {
+                continue;
+            }
+            processedLastNames.add(strLname);
+
+            String strFname = strConFspec(listCon[i], ns.strFirstNameSpec);
             
-            string strLname = listCon[i].LastName;
-            string strFname = strConFspec(listCon[i], ns.strFirstNameSpec);
-            
-            // get the set of all fname's for this lname
-            integer j = i + 1;
-            while (j < cCon && j < ns.cMaxUseOverrun && (isNoLastnames || listCon[j].LastName == strLname)) {
-                integer k = j + 1;
-                if (k == cCon || (!isNoLastnames && listCon[k].LastName != strLname)) {
-                    strFname += ' ' + ns.strAnd + ' ' + strConFspec(listCon[j], ns.strFirstNameSpec);
-                    j++;
-                    break;
-                } else {
-                    strFName += ', ' + strConFspec(listCon[j], ns.strFirstNameSpec);
-                    j++;
+            // get the set of additional fname's for this lname
+            list<String> listFname = new list<String>();
+            for (; next < cCon && (isNoLastnames || listCon[next].LastName == strLname); next++) {
+                String nextFname = strConFspec(listCon[next], ns.strFirstNameSpec);
+
+                if (nextFname != '') {
+                    listFName.add(nextFname);
                 }
             }
-            
-            // now all contacts from lname should have their fname in strFname.
-            string strCon = ns.strFullNameSpec;
-            strCon = strCon.replace(chLToken + 'LastName' + chRToken, strLname);
-            strCon = strCon.replace(chLToken + 'FirstNameSpec' + chRToken, strFname);
-            
-            // add it to the whole name
-            if (i > 0 && j < cCon && j < ns.cMaxUseOverrun) {
-                strName += ', ';
-            } else if (i > 0 && (j == cCon || j == ns.cMaxUseOverrun)) {
-                strName += ' ' + ns.strAnd + ' ';
-            }
-            strName += strCon;
 
-            if (j == ns.cMaxUseOverrun && cCon > ns.cMaxUseOverrun && ns.strFirstNameSpec != '') {
-                strName += ' ' + ns.strAnd + ' ' + ns.strOverrun;
+            // now put those additional fname's together
+            for (Integer k = 0; k < listFName.size(); k++) {
+                // if we've hit the limit, then bail out
+                if (i+k+1 == ns.cMaxUseOverrun) {
+                    // reached max contact count limit
+                    next = ns.cMaxUseOverrun;
+                    break;
+                }
+
+                // we want to use And if this is the last person in this lastname, or the last one we will include
+                if (k == listFName.size()-1 || (!isNoLastnames && (i+k+2) == ns.cMaxUseOverrun)) {
+                    strFname += ns.strAnd + listFName[k];
+                } else {
+                    strFName += ', ' + listFname[k];
+                }
             }
 
-            // continue with the next person we haven't included
-            i = j;
+            // create lname part using first contact with that lastname
+            String name = strConFSpec(listCon[i], ns.strFullNameSpec);
+            name = name.replace('FirstNameSpec', strFname);
+            if (strFname == '') {
+                name = name.trim();
+            }
+
+            names.add(name);
+   
+            Boolean willAddOverrun = next >= ns.cMaxUseOverrun && 
+                cCon > ns.cMaxUseOverrun && 
+                ns.strFirstNameSpec != '' && 
+                ns.strOverrun != null;
+
+            if (willAddOverrun) {
+                names.add(ns.strOverrun);
+            }            
         }
-        
-        return ns.strPrefix + strName + ns.strSuffix;
+
+        return ns.strPrefix + buildName(ns, names) + ns.strSuffix;
+    }
+    
+    /*******************************************************************************************************
+    * @description Concatenate string out of individual formatted names.
+    * @param ns The namespec class
+    * @param names List of strings to concatenate
+    * return string Concatenated string where names are separated by comma except 
+    * the last string is linked with the namespec's AND delimiter 
+    */
+    private static String buildName(NameSpec ns, String[] names) {
+        String name = '';
+        String delimiter = '';
+        Integer size = names.size();
+
+        for (Integer i = 0; i < size; i++) {
+            if (i > 0 && i == size - 1) {
+                delimiter = ns.strAnd;
+            } else if (i > 0) {
+                delimiter = ', ';
+            }
+            name += delimiter + names[i];
+        }
+
+        return name;
     }
     
     /*******************************************************************************************************
@@ -286,7 +332,35 @@ public with sharing class HH_NameSpec implements HH_INaming {
         while (MyMatcher.find()) {
             // get the fieldname without the {}'s
             string strField = strFspec.substring(MyMatcher.start() + chLToken.length(), MyMatcher.end()-chRToken.length());
-            string val = string.valueOf(con.get(strField.trim()));
+            
+            //separate cross object references, i.e. account.name
+            list<string> splitField = (strField.split('\\.',0));
+            
+            //remove the field name itself to only include parent object references
+            string fieldName = splitField[splitField.size()-1].trim();
+            splitField.remove(splitField.size()-1);
+
+            //use the correct sObject
+            sObject thisObj;
+            if (!splitField.isEmpty()) {
+                thisObj = con.getsObject(splitField[0]);
+                splitField.remove(0);
+            } else {
+                thisObj = con;
+            }
+
+            //traverse parent relationships until the last one
+            for (string parentObj : splitField) {
+                if (thisObj != null) {
+                    thisObj = thisObj.getsObject(parentObj);
+                }
+            }
+
+            string val;
+            if (thisObj != null) {
+                val = string.valueOf(thisObj.get(fieldName));
+            }
+            
             // add back the {}'s for string substitution
             strField = chLToken + strField + chRToken;
             if (val == null) {   
@@ -297,6 +371,7 @@ public with sharing class HH_NameSpec implements HH_INaming {
             }
             str = str.replace(strField, val == null ? '' : val);
         }
+        //system.debug('**** strConFspec con: ' + con + ' strFspec: ' + strFspec + ' returns: ' + str);
         return str;     
     }
 
@@ -322,4 +397,23 @@ public with sharing class HH_NameSpec implements HH_INaming {
         return setStrField;     
     }
 
+    /*******************************************************************************************************
+    * @description Given a namespec string, returns the firstnamespec which is demarcated by an outer {! }
+    * specified in that string.
+    * @param strNameSpec The namespec string, ie. {!lastname} {! {!firstname} foo {!bar}} Family
+    * return string The firstnamespec string, ie. {! {!firstname} foo {!bar}}
+    */
+    private static string strFNameSpecFromStrNameSpec(string strNameSpec) {
+
+        // First, instantiate a new Pattern object looking for {! {! xxxx } }
+        Pattern MyPattern = Pattern.compile('\\{![^\\}]*\\{!.*\\}[^\\{!]*\\}');       
+        // Then instantiate a new Matcher object 
+        Matcher MyMatcher = MyPattern.matcher(strNameSpec);
+        
+        if (MyMatcher.find()) {
+            return strNameSpec.substring(MyMatcher.start(), MyMatcher.end());
+        } else {
+            return '';
+        }     
+    }
 }

@@ -58,7 +58,7 @@ public class ERR_Notifier {
 
         Error_Settings__c errorSettings = UTIL_CustomSettingsFacade.getErrorSettings();
         String errorNotifRecipient = errorSettings.Error_Notifications_To__c;
-            
+
         if (errorSettings.Error_Notifications_On__c == true && errorNotifRecipient != null) {
 
             //We will post to chatter, if enabled
@@ -70,18 +70,39 @@ public class ERR_Notifier {
                 List<String> sendList = new List<String>();
                 if (errorNotifRecipient instanceof id && errorNotifRecipient.startsWith(NotificationOptions.user)) {
                     List<User> useremaillist = new List<User>();
-                    useremaillist = [select email from User where id = :errorNotifRecipient and isActive = true];
+                    useremaillist = [SELECT email FROM User WHERE id = :errorNotifRecipient AND isActive = true];
                     for (User u : useremaillist)
                         sendList.add(u.email);
                 } else if(errorNotifRecipient == NotificationOptions.sysAdmins) {
-                    list<User> sysadminlist = [select email from User where User.Profile.Name = 'System Administrator' and isActive = true];
-                    for (User u : sysadminlist) {
-                        sendList.add(u.email);
-                    }
+                    sendList.addAll(getSystemAdminEmails());
                 }
+
                 sendEmailNotifications(context, sendList);
             }
         }
+    }
+
+    /*******************************************************************************************************
+    * @description Get the active System Administrators' emails.
+    * @return List<String> Emails
+    */
+    @TestVisible
+    private static List<String> getSystemAdminEmails() {
+        Set<String> emails = new Set<String>();
+        List<Id> sysAdminProfileIds = UTIL_Profile.getInstance().getProfileIds(UTIL_Profile.SYSTEM_ADMINISTRATOR);
+
+        if (sysAdminProfileIds.isEmpty() == false) {
+            for (User usr : [
+                    SELECT Email 
+                    FROM User 
+                    WHERE ProfileId IN :sysAdminProfileIds 
+                    AND IsActive = true
+            ]) {
+                emails.add(usr.Email);
+            }
+        }
+
+        return new List<String>(emails);
     }
 
     /*******************************************************************************************************
@@ -91,7 +112,7 @@ public class ERR_Notifier {
     * @return void
     */
     private static void sendEmailNotifications(String context, List<String> sendList) {
-        if (!system.isBatch() && !system.isFuture() && Limits.getFutureCalls() < Limits.getLimitFutureCalls()) {
+        if (!system.isBatch() && !system.isFuture() && Limits.getAsyncCalls() < Limits.getLimitAsyncCalls()) {
             //We cannot pass the context, because only primitive types can be passed to future methods.
             sendErrorQueueEmailNotificationFuture(sendList);
         } else if (system.isFuture()) {
@@ -144,10 +165,11 @@ public class ERR_Notifier {
         Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
         mail.setUseSignature(false);
         mail.setReplyTo('donotreply@salesforce.org');
-        mail.setSenderDisplayName('Nonprofit Starter Pack');
-        mail.setSubject('NPSP Error');
+        mail.setSenderDisplayName('Nonprofit Success Pack');
+        mail.setSubject('Salesforce Error');
         string bodyString = 'Organization: ' + UserInfo.getOrganizationName() + '(' + UserInfo.getOrganizationId() + ')\n';
-        bodyString += 'User: ' + UserInfo.getUserName() + '(' + UserInfo.getUserId() + ')';
+        bodyString += 'User: ' + UserInfo.getUserName() + '(' + UserInfo.getUserId() + ')\n\n';
+        bodyString += Label.ErrorEmailMessage + '\n';
         if (context == ERR_Handler_API.Context.RD.name())
             bodyString += system.label.npe03.RecurringDonationErrorEmailBody;
         bodyString += '\n\nErrors:';
@@ -177,7 +199,7 @@ public class ERR_Notifier {
                 List<SObject> postsToInsert = new List<SObject>();
                 for(Error__c error : errors) {
                     SObject post = (SObject)System.Type.forName('FeedItem').newInstance();
-                    post.put('Title', 'NPSP Error');
+                    post.put('Title', 'Salesforce Error');
                     String body = getErrorMessageBody(error);
                     post.put('Body', body);
                     post.put('ParentId', collaborationGroup.Id);

@@ -30,6 +30,7 @@
 /**
 * @author Salesforce.org
 * @date 2014
+* @group Address Management
 * @description Validator to provide address geocoding/verification through the Google Geocoding API
  */
 @isTest
@@ -125,7 +126,7 @@ public with sharing class ADDR_GoogleGeoAPI_Validator_TEST {
         Test.StopTest();
 
         System.assertEquals(1, returnedAddress.size());
-        System.assertEquals(false, returnedAddress[0].Verified__c);
+        System.assertEquals(true, returnedAddress[0].Verified__c);
         System.assertEquals(true, returnedAddress[0].Ambiguous__c);
     }
 

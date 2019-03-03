@@ -33,24 +33,42 @@
 * @group Settings
 * @description Controller for the Allocations settings page.
 */
-
 public with sharing class STG_PanelAllocations_CTRL extends STG_Panel { 
 
     /*********************************************************************************************************
     * @description Returns the string Id of the Allocations panel. 
     */
-    public override string idPanel() { return 'idPanelAllocations'; }
+    public override String idPanel() { return 'idPanelAllocations'; }
 
     /*********************************************************************************************************
-    * @description Whether we are currently running the batch process 
+    * @description String that holds the selected Allocation Level from the settings picklist
     */
-    public boolean isRunningBatch { get; set; }
+    public String strAllocationLevel {get;set;}
 
     /*********************************************************************************************************
     * @description The panel's constructor.
     */
     public STG_PanelAllocations_CTRL() {
-        isRunningBatch = false;
+        setAllocationPicklistFromSetting();
+    }
+
+    /*********************************************************************************************************
+    * @description Update the UI picklist with the current Allocation Type setting
+    */
+    public void setAllocationPicklistFromSetting(){
+        if(STG_Panel.stgService.stgAllo.Payment_Allocations_Enabled__c == true){
+            strAllocationLevel = paymentLabel;
+        } else {
+            strAllocationLevel = oppLabel;
+        }
+    }
+
+    /*********************************************************************************************************
+    * @description Enable or disable payment allocations based on settings selection
+    */
+    public void setAllocationLevelFromSelection(){
+        STG_Panel.stgService.stgAllo.Payment_Allocations_Enabled__c = 
+            (strAllocationLevel == paymentLabel);
     }
 
     /*********************************************************************************************************
@@ -87,7 +105,33 @@ public with sharing class STG_PanelAllocations_CTRL extends STG_Panel {
         }
         private set;
     }
-    
+
+    /**
+     * @description A user friendly rendering of record type ids by record type
+     * name for Excluded Opp RecTypes
+     */
+    static public String strExcludedOppRecTypesReadOnly {
+        get {
+            if (strExcludedOppRecTypesReadOnly == null) {
+                strExcludedOppRecTypesReadOnly = STG_Panel.getRecordTypeNamesFromPicklistString(
+                    Opportunity.sObjectType,
+                    STG_Panel.stgService.stgAllo.Excluded_Opp_RecTypes__c
+                );
+            }
+            return strExcludedOppRecTypesReadOnly;
+        }
+        private set;
+    }
+
+    /*******************************************************************************************************
+    * @description Cancels the edit. Returns page to View mode.
+    * @return PageReference The page to redirect to, if any.
+    */
+    public override PageReference cancelEdit() {
+        setAllocationPicklistFromSetting();
+        return super.cancelEdit();
+    }
+
     /*********************************************************************************************************
     * @description Action Method to save the current settings
     * If default allocations are enabled, ensure a default GAU is selected.
@@ -103,17 +147,14 @@ public with sharing class STG_PanelAllocations_CTRL extends STG_Panel {
         STG_Panel.stgService.stgAllo.Default__c = allo.General_Accounting_Unit__c;
         strDefaultGAUName = null;
 
-        return super.saveSettings();
-    }
+        setAllocationLevelFromSelection();
 
-    /*********************************************************************************************************
-    * @description Action Method to run the Batch Opp Rollups  
-    * @return null
-    */
-    public PageReference runBatch() {
-        // run batch rollup
-        isRunningBatch = true;
-        id batchProcessId = database.executeBatch(new ALLO_MakeDefaultAllocations_BATCH());
-        return null;
+        if (STG_Panel.stgService.stgAllo.Payment_Allocations_Enabled__c == true && 
+            !STG_Panel.stgService.stgAllo.Default_Allocations_Enabled__c) {
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, Label.alloDefaultNotEnabled));
+                return null;
+        }
+
+        return super.saveSettings();
     }
 }

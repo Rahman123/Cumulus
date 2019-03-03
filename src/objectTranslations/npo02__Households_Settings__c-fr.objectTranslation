@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObjectTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <caseValues>
+        <plural>false</plural>
+        <value><!-- Households Settings --></value>
+    </caseValues>
+    <caseValues>
+        <plural>true</plural>
+        <value><!-- Households Settings --></value>
+    </caseValues>
+    <fields>
+        <help>Le rôle donné aux contacts devant recevoir un crédit de groupe pour un don jumelé.</help>
+        <label>Rôle de donateur jumelé</label>
+        <name>Matched_Donor_Role__c</name>
+    </fields>
+    <fields>
+        <help><!-- Check this box to use Dated Conversion Rates when Advanced Currency Management is enabled in this Organization. If unchecked and ACM is enabled, all NPSP roll-ups will use the default exchange rate for by currency. --></help>
+        <label><!-- Use Dated Conversion Rates if available --></label>
+        <name>Use_Dated_Conversion_Rates__c</name>
+    </fields>
+    <fields>
+        <help><!-- Specify which Opportunity Stage(s) are in a Committed state, with additional payments expected. When defining multiple stages, separate them with a semicolon. --></help>
+        <label><!-- Opportunity Committed Stage(s) --></label>
+        <name>Opportunity_Committed_Stages__c</name>
+    </fields>
+    <fields>
+        <help><!-- Specify which Opportunity Stage(s) are in a Finalized state, with no additional payments  expected. When defining multiple stages, separate them with a semicolon. --></help>
+        <label><!-- Opportunity Finalized Stage(s) --></label>
+        <name>Opportunity_Finalized_Stages__c</name>
+    </fields>
+    <gender><!-- Masculine --></gender>
+    <startsWith><!-- Consonant --></startsWith>
+</CustomObjectTranslation>

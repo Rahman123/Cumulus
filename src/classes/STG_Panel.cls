@@ -48,6 +48,30 @@ public with sharing virtual class STG_Panel {
     * @description the id of the panel, which we assume all derived classes will override.
     */ 
 	public virtual string idPanel() { return null; }
+
+    /*******************************************************************************************************
+    * @description Opportunity object label
+    */ 
+    static public string oppLabel {
+        get {
+            if(oppLabel == null){
+                oppLabel = Schema.sObjectType.Opportunity.getLabel();
+            }
+            return oppLabel;
+        } private set;
+    }
+
+    /*******************************************************************************************************
+    * @description Payment object label
+    */ 
+	static public string paymentLabel {
+        get {
+            if(paymentLabel == null){
+                paymentLabel = Schema.sObjectType.npe01__OppPayment__c.getLabel();
+            }
+            return paymentLabel;
+        } private set;
+    }
 	
     /*******************************************************************************************************
     * @description is the panel in Edit Mode
@@ -60,7 +84,7 @@ public with sharing virtual class STG_Panel {
 	public boolean isReadOnlyMode {
 		get {
 			return !isEditMode;
-		}
+		} private set;
 	}
     
     /*******************************************************************************************************
@@ -70,11 +94,9 @@ public with sharing virtual class STG_Panel {
         get {
             if (stgService == null) { 
             	stgService = STG_SettingsService.stgService;
-                //UTIL_Debug.debug('***** getting STG_SettingsService.stgService: ' + stgService);
             }
             return stgService;
-        }
-        private set;
+        } set;
     }
 
     /*******************************************************************************************************
@@ -176,13 +198,28 @@ public with sharing virtual class STG_Panel {
             if (listSOContactRecTypes == null) {
                 listSOContactRecTypes = new list<SelectOption>();
                 listSOContactRecTypes.add(new SelectOption('', Label.stgLabelNone));
-                listSOContactRecTypes.addAll(UTIL_RecordTypes.getStringRecordTypesForSelectList('Contact'));            
+                listSOContactRecTypes.addAll(UTIL_RecordTypes.getStringRecordTypesForSelectList(Contact.sObjectType));            
             }       
             return listSOContactRecTypes;
         }
         private set;
     }    
-        
+
+    /*
+    * @description list of SelectOptions for Contact Record Type Ids
+    */
+    static public List<SelectOption> listSOContactRecTypeIds {
+        get {
+            if (listSOContactRecTypeIds == null) {
+                listSOContactRecTypeIds = new list<SelectOption>();
+                listSOContactRecTypeIds.add(new SelectOption('', Label.stgLabelNone));
+                listSOContactRecTypeIds.addAll(UTIL_RecordTypes.getRecordTypesForSelectList(Contact.sObjectType));            
+            }
+            return listSOContactRecTypeIds;
+        }
+        private set;
+    }
+
     /*******************************************************************************************************
     * @description list of SelectOptions for Acount Record Type Ids
     */ 
@@ -191,7 +228,7 @@ public with sharing virtual class STG_Panel {
             if (listSOAccountRecTypeIds == null) {
                 listSOAccountRecTypeIds = new list<SelectOption>();
                 listSOAccountRecTypeIds.add(new SelectOption('', Label.stgLabelNone));
-                listSOAccountRecTypeIds.addAll(UTIL_RecordTypes.getRecordTypesForSelectList('Account'));            
+                listSOAccountRecTypeIds.addAll(UTIL_RecordTypes.getRecordTypesForSelectList(Account.sObjectType));            
             }       
             return listSOAccountRecTypeIds;
         }
@@ -206,7 +243,7 @@ public with sharing virtual class STG_Panel {
             if (listSOOppRecTypes == null) {
                 listSOOppRecTypes = new list<SelectOption>();
                 listSOOppRecTypes.add(new SelectOption('', Label.stgLabelNone));
-                listSOOppRecTypes.addAll(UTIL_RecordTypes.getStringRecordTypesForSelectList('Opportunity'));            
+                listSOOppRecTypes.addAll(UTIL_RecordTypes.getStringRecordTypesForSelectList(Opportunity.sObjectType));            
             }       
             return listSOOppRecTypes;
         }
@@ -221,12 +258,27 @@ public with sharing virtual class STG_Panel {
             if (listSOOppRecTypesIds == null) {
                 listSOOppRecTypesIds = new list<SelectOption>();
                 listSOOppRecTypesIds.add(new SelectOption('', Label.stgLabelNone));
-                listSOOppRecTypesIds.addAll(UTIL_RecordTypes.getRecordTypesForSelectList('Opportunity'));            
+                listSOOppRecTypesIds.addAll(UTIL_RecordTypes.getRecordTypesForSelectList(Opportunity.sObjectType));            
             }       
             return listSOOppRecTypesIds;
         }
         private set;
     }    
+
+    /*******************************************************************************************************
+    * @description list of SelectOptions for Allocation Level setting
+    */ 
+    static public list<SelectOption> listSOAllocationLevels {
+        get {
+            if (listSOAllocationLevels == null) {
+                listSOAllocationLevels = new list<SelectOption>();
+                listSOAllocationLevels.add(new SelectOption(oppLabel, oppLabel));
+                listSOAllocationLevels.add(new SelectOption(paymentLabel, paymentLabel));
+            }
+            return listSOAllocationLevels;
+        }
+        private set;
+    }
 
     /*******************************************************************************************************
     * @description list of SelectOptions for Opportunity Contact Roles
@@ -313,7 +365,12 @@ public with sharing virtual class STG_Panel {
             if (listSOMailingReportIds == null) {
                 listSOMailingReportIds = new list<SelectOption>();
                 listSOMailingReportIds.add(new SelectOption('', Label.stgLabelNone));
-                for (Report rpt : [select Id, Name from Report where Name like '%mail%']) {
+                for (Report rpt : [SELECT Id, Name, DeveloperName, NamespacePrefix FROM Report WHERE Name LIKE '%mail%']) {
+                    if (rpt.NamespacePrefix == 'npo02' && rpt.DeveloperName == 'NPSP_Campaign_Household_Mailing_List') {
+                        // The original report included in the Households package is no longer compatible with
+                        // the Household Mailing List button so exclude it from this picklist.
+                        continue;
+                    }
                     listSOMailingReportIds.add(new SelectOption(rpt.Id, rpt.Name));
                 }
             }
@@ -321,30 +378,70 @@ public with sharing virtual class STG_Panel {
         }
         private set;
     }
-       
-    /*******************************************************************************************************
-    * @description the Household Account Record Type Name
-    */ 
-    static public string strHHAccountRecordTypeLabel {
-    	get {
-    		if (strHHAccountRecordTypeLabel == null) {
-    			strHHAccountRecordTypeLabel = UTIL_RecordTypes.GetRecordTypeName('Account', stgService.stgCon.npe01__HH_Account_RecordTypeID__c);
-    		}
-    		return strHHAccountRecordTypeLabel;
-    	}
-    	private set;
-    }
-       
-    /*******************************************************************************************************
-    * @description the One-to-One Account Record Type Name
-    */ 
-    static public string strOneToOneRecordTypeLabel {
-        get {
-            if (strOneToOneRecordTypeLabel == null) {
-                strOneToOneRecordTypeLabel = UTIL_RecordTypes.GetRecordTypeName('Account', stgService.stgCon.npe01__One_to_One_RecordTypeID__c);
-            }
-            return strOneToOneRecordTypeLabel;
+  
+    /**
+     * @description Given an sObjectType and a list of semicolon ';' separated
+     * ids corresponding to record types, return a comma ',' separated string
+     * that contain the names of those record types.  If the given idValues
+     * string is blank, the given blankValue will be returned.
+     *
+     * @param Schema.sObjectType The object type to which the record types apply
+     * @param idValues A semicolon separated string of ids
+     * @param blankValue The string returned when the given idValues string is blank
+     * @return String
+     */
+    public static String getRecordTypeNamesFromPicklistString(Schema.sObjectType objectType, String idValues, String blankValue) {
+        if (idValues == null) {
+            return blankValue;
         }
-        private set;
-    }     
+
+        Map<Id, Schema.RecordTypeInfo> recordTypes = objectType.getDescribe().getRecordTypeInfosById();
+        List<String> recordTypeIdStrings = idValues.split(';', 0);
+        List<String> recordTypeNames = new List<String>();
+
+        for (String recordTypeIdString : recordTypeIdStrings) {
+            Id recordTypeId;
+
+            if (recordTypeIdString instanceof Id) {
+                recordTypeId = (Id) recordTypeIdString;
+            } else {
+                continue;
+            }
+
+            if (recordTypes.containsKey(recordTypeId)) {
+                recordTypeNames.add(recordTypes.get(recordTypeId).getName());
+            }
+        }
+
+        if (recordTypeNames.isEmpty()) {
+            return blankValue;
+        } else {
+            return String.join(recordTypeNames, ', ');
+        }
+    }
+
+    /**
+     * @description Given an sObjectType and a list of semicolon ';' separated
+     * ids corresponding to record types, return a comma ',' separated string
+     * that contain the names of those record types.
+     *
+     * @param Schema.sObjectType The object type to which the record types apply
+     * @param idValues A semicolon separated string of ids
+     * @return String
+     */
+    public static String getRecordTypeNamesFromPicklistString(Schema.sObjectType objectType, String idValues) {
+        return getRecordTypeNamesFromPicklistString(objectType, idValues, Label.stgLabelNone);
+    }
+
+    /*******************************************************************************************************
+    * @description Returns whether the running user is a System Administrator.
+    * @return boolean
+    */
+    public static Boolean runningUserIsAdmin() {
+
+        Id runningUserId = UserInfo.getUserId();
+        Id runningUserProfileId = UserInfo.getProfileId();
+        return USER_UserService.isSysAdmin(new List<User>{(new User(Id = runningUserId, ProfileId = runningUserProfileId))}).get(runningUserId);
+
+    }
 }

@@ -36,7 +36,7 @@
  * @description Class that queries custom object to retrieve classes to call for creation or modification
  * of a record of a specific object type.
  */
-public class TDTM_ObjectDataGateway implements TDTM_iTableDataGateway {
+public without sharing class TDTM_ObjectDataGateway implements TDTM_iTableDataGateway {
     
     //private static List<ToRunOnObjectAction> classesQueried = new List<ToRunOnObjectAction>();
     private static Integer rowCount;
@@ -47,86 +47,60 @@ public class TDTM_ObjectDataGateway implements TDTM_iTableDataGateway {
      */
     public Boolean isEmpty() {
         if(rowCount == null) {
-            List<AggregateResult> result = [select count(Id) rowCount from Trigger_Handler__c];
-            rowCount = (Integer)result[0].get('rowCount');
+            List<Trigger_Handler__c> result = [select Id from Trigger_Handler__c limit 1];
+            rowCount = result.size();
         }
-        if(rowCount == 0)
-            return true;    
+        if(rowCount == 0) {
+            return true;
+        }
         return false;
     }
-    
+
     /*******************************************************************************************************
      * @description Returns the classes that will be called for the specified ojbect and action. Returned list 
-     *              is sorted by load order.
+     *              is sorted by load order. Filters out in-active handlers and any where the list of 
+     *              excluded usernames includes the current context user.
      * @param objectName The name of the object.
      * @param action The action (before insert, after insert,...). 
      * @return List<SObject> List of classes to call, sorted by load order.
      **/
     public static List<SObject> getClassesToCallForObject(String objectName, TDTM_Runnable.Action action) {   
         string strAction = action.Name();
-        List<SObject> listClasses = new list<Sobject>();
+        string currUserName = UserInfo.getUserName();
+        List<SObject> listClasses = new List<Sobject>();
         for (Trigger_Handler__c th : listTH) {
-            if (th.Object__c == objectName && th.Trigger_Action__c.contains(strAction)) 
+            Set<String> excludedUserNames = (th.Usernames_to_Exclude__c != null ?
+                    new Set<String>(th.Usernames_to_Exclude__c.split(';')) : new Set<String>());
+            if (th.Object__c == objectName && th.Trigger_Action__c.contains(strAction) && th.Active__c == true
+                    && !excludedUserNames.contains(currUserName)) {
                 listClasses.add(th);
+            }
         }
         return listClasses;
     }
-    
+
     /*******************************************************************************************************
      * @description to allow test code to modify the saved trigger handlers and have them reread into the cache.
-     */ 
+     */
     public static void ClearCachedTriggerHandlersForTest() {
         listTH = null;
     }
-    
+
     /*******************************************************************************************************
      * @description holds the trigger handlers cached in a list, to avoid repetitive soql calls.
      */
-    private static list<Trigger_Handler__c> listTH {
+    public static list<Trigger_Handler__c> listTH {
         get {
-            if (listTH == null) {
-                listTH =  [select Asynchronous__c, Class__c, Load_Order__c, Object__c, Active__c, 
-                    Trigger_Action__c from Trigger_Handler__c where Active__c = true order by Load_Order__c];
+            if (ADV_PackageInfo_SVC.useAdv() && ADV_PackageInfo_SVC.getApiNPSP() != null) {
+                listTH = ADV_PackageInfo_SVC.getApiNPSP().getDefaultTdtmConfigNpspRecords(listTH);
+            } else {
+                if (listTH == null) {
+                    listTH =  [SELECT Asynchronous__c, Class__c, Load_Order__c, Object__c, Active__c, Usernames_to_Exclude__c,
+                        Trigger_Action__c, User_Managed__c FROM Trigger_Handler__c ORDER BY Load_Order__c];
+                }
             }
             return listTH;
         }
         set;
-    }    
-    
-/********* old implementation ****************
-    public static List<SObject> getClassesToCallForObject(String objectName, TDTM_Runnable.Action action) {   
-        ToRunOnObjectAction toRun = objectActionQueried(objectName, action);
-        if(toRun != null) {
-            return toRun.classesToCall;
-        } else {
-            List<SObject> classesToCall =  [select Asynchronous__c, Class__c, Load_Order__c, Object__c, Active__c, 
-                Trigger_Action__c from Trigger_Handler__c where Active__c = true and Object__c = :objectName and 
-                Trigger_Action__c includes ( :action.name() ) order by Load_Order__c];
-            toRun = new ToRunOnObjectAction(objectName, action, classesToCall);
-            classesQueried.add(toRun);
-            return classesToCall;
-        }
     }
-    
-    private static ToRunOnObjectAction objectActionQueried(String objectName, TDTM_Runnable.Action action) {
-        for(ToRunOnObjectAction toRun : classesQueried) {
-            if(toRun.objectName == objectName && toRun.action == action) {
-              return toRun;
-            }
-        }
-        return null;
-    }
-    
-    private class ToRunOnObjectAction {
-        private String objectName;
-        private TDTM_Runnable.Action action;
-        private List<SObject> classesToCall;
-        
-        ToRunOnObjectAction(String objectName, TDTM_Runnable.Action action, List<SObject> classesToCall) {
-            this.objectName = objectName;
-            this.action = action;
-            this.classesToCall = classesToCall;
-        }
-    }
-***************/
 }

@@ -33,9 +33,14 @@
 * @group Recurring Donations
 * @description Class provides a batchable wrapper for open ended recurring donations
 */
-public without sharing class RD_RecurringDonations_BATCH implements Database.Batchable<sObject>, Database.Stateful, 
-UTIL_MasterSchedulableHelper.UTIL_IRecurring {
-	
+public without sharing class RD_RecurringDonations_BATCH implements Database.Batchable<sObject>, Database.Stateful,
+Schedulable {
+
+    /*******************************************************************************************************
+    * @description Flag to specify when running the Refresh Opportunities button on Recurring Donations
+    */
+    public static Boolean isBatchButton = false;
+
     /*******************************************************************************************************
     * @description holds the query of all recurring donations to process
     */ 
@@ -50,26 +55,28 @@ UTIL_MasterSchedulableHelper.UTIL_IRecurring {
     * @description Count of RD's that hit errors while processing
     */ 
     public Integer failuresCount = 0;
+
+    /*******************************************************************************************************
+    * @description Batch size for Apex Job. Uses default of 50 if Custom Setting is null.
+    */
+    public static Integer batchSize = (UTIL_CustomSettingsFacade.getRecurringDonationsSettings().Recurring_Donation_Batch_Size__c != null) ?
+            UTIL_CustomSettingsFacade.getRecurringDonationsSettings().Recurring_Donation_Batch_Size__c.intValue() : 50;
+
     
     /*******************************************************************************************************
     * @description Class constructor
     */ 
     public RD_RecurringDonations_BATCH() {
-    	query = RD_RecurringDonations.strQueryRDNoWhere();
+        query = RD_RecurringDonations.strQueryRDNoWhere();
         query += ' where npe03__Open_Ended_Status__c = \'' + system.label.npe03.RecurringDonationOpenStatus + '\'';
-    	RD_ProcessControl.batchButton = true;
+        RD_RecurringDonations_BATCH.isBatchButton = true;
     }
-        
+
     /*******************************************************************************************************
     * @description Executes the RD Batch process.
-    * @return boolean True if process executed, False if unable to run.
     */ 
-    public Boolean executeReturnStatus() {
-        if (UTIL_JobScheduler.canRunBatch()) {
-            Id batchInstanceId = Database.executeBatch(this, 50); 
-            return true;
-        }
-        return false;
+    public void execute(SchedulableContext context) {
+        Database.executeBatch(new RD_RecurringDonations_BATCH(), RD_RecurringDonations_BATCH.batchSize);
     }
     
     /*******************************************************************************************************
@@ -78,6 +85,9 @@ UTIL_MasterSchedulableHelper.UTIL_IRecurring {
     * @return database.Querylocator  
     */
     public database.Querylocator start(Database.BatchableContext bc) {
+        // this must return a QueryLocator, or else uncaught exceptions in the
+        // execute() method will not properly update the processed/failure
+        // counts (see W-2443023).
         return Database.getQueryLocator(query);      
     }
     
@@ -88,15 +98,9 @@ UTIL_MasterSchedulableHelper.UTIL_IRecurring {
     * @return void  
     */
     public void execute(Database.BatchableContext bc, Sobject[] result) {
-    	Savepoint sp = Database.setSavepoint();
-        try {
-	        RD_ProcessControl.batchButton = true;
-	        recCount += result.size();
-	        failuresCount = RD_RecurringDonations.evaluateRecurringDonationsForNewOppInsert(result);
-	    } catch(Exception e) {
-            Database.rollback(sp);
-            ERR_Handler.processError(e, ERR_Handler_API.Context.RD);
-        }    
+        RD_RecurringDonations_BATCH.isBatchButton = true;
+        recCount += result.size();
+        failuresCount = RD_RecurringDonations.evaluateRecurringDonationsForNewOppInsert(result);
     }
 
     /*******************************************************************************************************
@@ -115,11 +119,5 @@ UTIL_MasterSchedulableHelper.UTIL_IRecurring {
         rds.npe03__Number_of_Failures__c = failuresCount;
         if (!Test.isRunningTest())
             upsert rds;                            
-        
-        //if needed, send error notifications
-        ERR_Notifier.sendErrorNotifications(ERR_Handler_API.Context.RD.name());        
     }
-    
-    
-
 }

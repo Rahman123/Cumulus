@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObjectTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <caseValues>
+        <plural>false</plural>
+        <value><!-- General Accounting Unit --></value>
+    </caseValues>
+    <caseValues>
+        <plural>true</plural>
+        <value><!-- General Accounting Unit --></value>
+    </caseValues>
+    <fields>
+        <help>Actieve Bestemmingen zijn beschikbaar bij Toewijzingen. Inactieve Bestemmingen kunnen geen nieuwe Toewijzingen hebben.</help>
+        <label>Actief</label>
+        <name>Active__c</name>
+    </fields>
+    <fields>
+        <help>Het gemiddelde van alle Toewijzingen van alle tijden die bij deze Bestemming horen</help>
+        <label>Gemiddelde Toewijzing</label>
+        <name>Average_Allocation__c</name>
+    </fields>
+    <fields>
+        <help>Extra informatie over deze Bestemming.</help>
+        <label>Beschrijving</label>
+        <name>Description__c</name>
+    </fields>
+    <fields>
+        <help>De eerste Opportunity Sluitingsdatum van een Toewijzing met deze Bestemming.</help>
+        <label>Eerste Toewijzingsdatum</label>
+        <name>First_Allocation_Date__c</name>
+    </fields>
+    <fields>
+        <help>De grootste Toewijzing op deze Bestemming.</help>
+        <label>Grootste Toewijzing</label>
+        <name>Largest_Allocation__c</name>
+    </fields>
+    <fields>
+        <help>De laatste Opportunity Sluitingsdatum van een Toewijzing met deze Bestemming.</help>
+        <label>Laatste Toewijzingsdatum</label>
+        <name>Last_Allocation_Date__c</name>
+    </fields>
+    <fields>
+        <help>Totaal aantal Toewijzingen van Opportunities in een Gesloten/Gewonnen fase in de laatste N dagen. De waarde van N kan worden gewijzigd in de instellingen.</help>
+        <label>Aantal Toewijzingen Laatste N Dagen</label>
+        <name>Number_of_Allocations_Last_N_Days__c</name>
+    </fields>
+    <fields>
+        <help>Totaal aantal Toewijzingen van Opportunities in een Gesloten/Gewonnen fase in het vorig jaar.</help>
+        <label>Aantal Toewijzingen Vorig Jaar</label>
+        <name>Number_of_Allocations_Last_Year__c</name>
+    </fields>
+    <fields>
+        <help>Totaal aantal Toewijzingen van Opportunities in een Gesloten/Gewonnen fase in het huidig jaar.</help>
+        <label>Aantal Toewijzingen Huidig Jaar</label>
+        <name>Number_of_Allocations_This_Year__c</name>
+    </fields>
+    <fields>
+        <help>Totaal aantal Toewijzingen van Opportunities in een Gesloten/Gewonnen fase van twee jaar geleden.</help>
+        <label>Aantal Toewijzingen Twee Jaar Geleden</label>
+        <name>Number_of_Allocations_Two_Years_Ago__c</name>
+    </fields>
+    <fields>
+        <help>De kleinste Toewijzing op deze Bestemming.</help>
+        <label>Kleinste Toewijzing</label>
+        <name>Smallest_Allocation__c</name>
+    </fields>
+    <fields>
+        <help>De som van alle Toewijzingen van Opportunities in een Gesloten/Gewonnen fase in de laatste N dagen. De waarde van N kan worden gewijzigd in de instellingen.</help>
+        <label>Totaal Toewijzingen Laatste N Dagen</label>
+        <name>Total_Allocations_Last_N_Days__c</name>
+    </fields>
+    <fields>
+        <help>De som van alle Toewijzingen van Opportunities in een Gesloten/Gewonnen fase in het vorig jaar.</help>
+        <label>Totaal Toewijzingen Vorig Jaar</label>
+        <name>Total_Allocations_Last_Year__c</name>
+    </fields>
+    <fields>
+        <help>De som van alle Toewijzingen van Opportunities in een Gesloten/Gewonnen fase in het huidig jaar.</help>
+        <label>Totaal Toewijzingen Huidig Jaar</label>
+        <name>Total_Allocations_This_Year__c</name>
+    </fields>
+    <fields>
+        <help>De som van alle Toewijzingen van Opportunities in een Gesloten/Gewonnen fase van twee jaar geleden.</help>
+        <label>Totaal Toewijzingen Twee Jaar Geleden</label>
+        <name>Total_Allocations_Two_Years_Ago__c</name>
+    </fields>
+    <fields>
+        <help>De som van alle Toewijzingen van Opportunities in een Gesloten/Gewonnen fase.</help>
+        <label>Totaal Toewijzingen</label>
+        <name>Total_Allocations__c</name>
+    </fields>
+    <fields>
+        <help>Totaal aantal Toewijzingen van Opportunities in een Gesloten/Gewonnen fase.</help>
+        <label>Totaal Aantal Toewijzingen</label>
+        <name>Total_Number_of_Allocations__c</name>
+    </fields>
+    <gender><!-- Neuter --></gender>
+    <layouts>
+        <layout>General Accounting Unit Layout</layout>
+        <sections>
+            <label>Toewijzing Informatie</label>
+            <section>Allocation Information</section>
+        </sections>
+        <sections>
+            <label>Toewijzing Totalen</label>
+            <section>Allocation Totals</section>
+        </sections>
+        <sections>
+            <label>Aangepaste Koppelingen</label>
+            <section>Custom Links</section>
+        </sections>
+    </layouts>
+    <nameFieldLabel><!-- General Accounting Unit Name --></nameFieldLabel>
+    <webLinks>
+        <label>Herbereken Rollup</label>
+        <name>Recalculate_Rollups</name>
+    </webLinks>
+</CustomObjectTranslation>

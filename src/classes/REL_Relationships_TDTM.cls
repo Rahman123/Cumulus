@@ -29,44 +29,94 @@
 */
 /**
 * @author Salesforce.org
-* @description Implements relationships behavior 
+* @date 2013
+* @group Relationships
+* @group-content ../../ApexDocContent/Relationships.htm
+* @description Trigger Handler on Relationships that implements reciprocal relationships behavior.
 */
 public class REL_Relationships_TDTM extends TDTM_Runnable {
 
+    /*********************************************************************
+    * @description Set of field names ineligible for syncing across reciprocal pairs  
+    */
+    private static final Set<String> relSystemFields = new Set<String>{
+        'npe4__system_systemcreated__c','npe4__contact__c','npe4__reciprocalrelationship__c','npe4__relatedcontact__c','npe4__type__c'};
+
+    /*********************************************************************
+    * @description Set of field names synced across reciprocal pairs  
+    */
+    private static Set<String> syncFields {
+        get { 
+            if (syncFields == null) {
+                syncFields = new Set<String>();
+                npe4__Relationship_Settings__c rs = UTIL_CustomSettingsFacade.getRelationshipSettings();
+                
+                map<String, Schema.DescribeFieldResult> relFieldDescMap = UTIL_Describe.getAllFieldsDescribe('npe4__Relationship__c'); 
+                Set<String> excludedFields = new Set<String>(UTIL_ListCustomSettingsFacade.getMapRelationshipFieldSyncSettings().keySet());              
+                excludedFields.addAll(relSystemFields);
+                
+                //only sync editable custom fields not excluded in settings or constant
+                for (string fieldName : relFieldDescMap.keyset()) {
+                    if (!excludedFields.contains(fieldName) && relFieldDescMap.get(fieldName).isCustom()  
+                        && !relFieldDescMap.get(fieldName).isCalculated() && !relFieldDescMap.get(fieldName).isAutoNumber()
+                        && (fieldName.startsWith('npe4__') || rs.Enable_Custom_Field_Sync__c)) {
+                        
+                            syncFields.add(fieldName); 
+                    }    
+                }
+            } 
+            UTIL_Debug.debug('***************** RELATIONSHIP SYNC FIELDS: ' + syncFields);
+            return syncFields;
+        }
+        private set;
+    }
+
+    /*******************************************************************************************************
+    * @description Overload of run method that casts trigger objects to Relationships and passes them to 
+    * runForRelationships() with correct parameters
+    * @param newlist Sobjects that are being triggered 
+    * @param oldlist Sobjects with values before trigger event 
+    * @param triggerAction Trigger action that is occuring 
+    * @param objResult Schema.DescribeSobjectResult for npe4__Relationship__c
+    * @return DmlWrapper
+    */
     public override DmlWrapper run(List<SObject> newlist, List<SObject> oldlist, 
     TDTM_Runnable.Action triggerAction, Schema.DescribeSObjectResult objResult) {
     	
     	List<npe4__Relationship__c> newListCasted = (newList == null ? new List<npe4__Relationship__c>(): (List<npe4__Relationship__c>)newList);
         List<npe4__Relationship__c> oldListCasted = (oldList == null ? new List<npe4__Relationship__c>(): (List<npe4__Relationship__c>)oldList);
     	
-    	if(triggerAction != TDTM_Runnable.Action.afterDelete) {
-    		return runForRelationships(newListCasted, oldListCasted, triggerAction);
-        } else {
-        	return runForRelationships(oldListCasted, null, triggerAction);
-        }
+		return runForRelationships(newListCasted, oldListCasted, triggerAction);
     }
     
-    /// <name> REL_Relationships </name>
-    /// <summary> Overloads the REL_Relationships object constructor to handle Relationship processing </summary>
-    /// <param name="Relationships"> Relationship objects that are being triggered </param>
-    /// <param name="oldRelationships"> Relationships object values before trigger event </param>
-    /// <param name="ta"> Trigger action that is occuring </param>
+    /*******************************************************************************************************
+    * @description Method that implements correct action based on trigger action 
+    * @param newlist Relationship objects that are being triggered 
+    * @param oldlist Relationships object values before trigger event 
+    * @param triggerAction Trigger action that is occuring 
+    * @return DmlWrapper
+    */
     private DmlWrapper runForRelationships(List<npe4__Relationship__c> newlist, List<npe4__Relationship__c> oldlist, 
     TDTM_Runnable.Action triggerAction) {
-    	    
-    	DmlWrapper mainWrapper = new DmlWrapper();
-    	
+
+        if (TDTM_ProcessControl.isRecursive(TDTM_ProcessControl.flag.REL)) {
+            return null;
+        }
+
+        DmlWrapper mainWrapper = new DmlWrapper();
+
         // Relationship list for termination updates
         List<npe4__Relationship__c> origrelationships = new List<npe4__Relationship__c>();
         List<npe4__Relationship__c> relationshipsToCreate = new List<npe4__Relationship__c>();
         List<npe4__Relationship__c> relationshipsToUpdate = new List<npe4__Relationship__c>();
         List<npe4__Relationship__c> relationshipsToDelete = new List<npe4__Relationship__c>();
         List<npe4__Relationship__c> reciprocalsToUpdate = new List<npe4__Relationship__c>();
-        
+
+        // Set the recursion flag up front because there could be DML operations before the main method ends.
         if (triggerAction == TDTM_Runnable.Action.afterUpdate) {
-            REL_ProcessControl.hasRun = true;
+            TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.REL, true);
         }
-        
+
         Integer i = 0;          // processing counter            
         for(npe4__Relationship__c r : newlist) {
             // AFTER INSERT
@@ -91,14 +141,19 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
                 }
             }
 
-            // AFTER DELETE
-            if (triggerAction == TDTM_Runnable.Action.afterDelete) {
-                if (r.npe4__ReciprocalRelationship__c != null) {
-                    relationshipsToDelete.add(r);
+            i++;
+        }
+
+        // AFTER DELETE
+        if (triggerAction == TDTM_Runnable.Action.AfterDelete) {
+            Map<Id, npe4__Relationship__c> deletedRelMap = new Map<Id, npe4__Relationship__c>(oldlist);
+            for (npe4__Relationship__c rel : oldList) {
+                
+                //check that the recirocal relationship isn't already in the deletion trigger set before adding for deletion
+                if (rel.npe4__ReciprocalRelationship__c != null && !deletedRelMap.containsKey(rel.npe4__ReciprocalRelationship__c)) {
+                    relationshipsToDelete.add(new npe4__Relationship__c(Id=rel.npe4__ReciprocalRelationship__c));
                 }
             }
-
-            i++;
         }
 
         if (relationshipsToCreate.size() > 0 ) {
@@ -116,47 +171,27 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
             
         }
         if (relationshipsToDelete.size() > 0 ) {
-            DmlWrapper wrapper = deleteRelationships(relationshipsToDelete);
-            mainWrapper.objectsToDelete.addAll(wrapper.objectsToDelete);
+            mainWrapper.objectsToDelete.addAll((List<SObject>)relationshipsToDelete);
         }
 
+        TDTM_TriggerHandler.processDML(mainWrapper);
         if (triggerAction == TDTM_Runnable.Action.afterUpdate) {
-            REL_ProcessControl.hasRun = false;
+            TDTM_ProcessControl.setRecursionFlag(TDTM_ProcessControl.flag.REL, false);
         }
-        return mainWrapper;
+        return null;
     }
 
-
-    /// <name> deleteRelationships </name>
-    /// <summary> Deletes Reciprocal Relationships when a Relationship is deleted </summary>
-    /// <param name="relationships">  </param>
-    public static DmlWrapper deleteRelationships(npe4__Relationship__c[] relationships) {
-    	UTIL_Debug.debug('****Deleting relationships: ' + relationships);
-    	DmlWrapper dmlWrapper = new DmlWrapper();
-        List<SObject> relationshipsToDelete = new List<SObject>();
-        for(npe4__Relationship__c r : Relationships) {
-        	npe4__Relationship__c relationshipToDelete;
-            if(r.npe4__ReciprocalRelationship__c != null) {
-            	relationshipToDelete = new npe4__Relationship__c(Id = r.npe4__ReciprocalRelationship__c);
-            } else if(r.npe4__RelatedContact__c == null) {
-            	relationshipToDelete = new npe4__Relationship__c(Id = r.Id);
-	        }
-	        relationshipsToDelete.add(relationshipToDelete);
-        }
-        if ( relationshipsToDelete.size() > 0 ) {
-            dmlWrapper.objectsToDelete.addAll(relationshipsToDelete);
-        }
-        return dmlWrapper;
-    }
-    
-    /// <name> reciprocate </name>
-    /// <summary>  </summary>
-    /// <param name="Relationships">  </param>
+    /*******************************************************************************************************
+    * @description Generates DmlWrapper list of non-SystemCreated relationships that need to be updated with 
+    * the Id of their SystemCreated reciprocal 
+    * @param Relationships List of Relationships 
+    * @return DmlWarapper
+    */ 
     public static DmlWrapper reciprocate(npe4__Relationship__c[] Relationships) {
     	DmlWrapper dmlWrapper = new DmlWrapper();
         List<SObject> relationshipsToUpdate = new List<SObject>();
         for(npe4__Relationship__c r : Relationships) {
-        	UTIL_Debug.debug('****Creating reciprocal relatioship');
+        	UTIL_Debug.debug('****Creating reciprocal relationship');
             npe4__Relationship__c copy = new npe4__Relationship__c(Id = r.npe4__ReciprocalRelationship__c, 
                                                                     npe4__ReciprocalRelationship__c = r.Id);
             relationshipsToUpdate.add(copy);
@@ -165,9 +200,11 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
         return dmlWrapper;
     }
     
-    /// <name> createRelationship </name>
-    /// <summary> Inserts a new reciprocal Relationship After a relationship is Inserted</summary>
-    /// <param name="Relationships">  </param>
+    /*******************************************************************************************************
+    * @description Creates new reciprocal Relationship records for those being Inserted
+    * @param Relationships  list of new Relationships being inserted
+    * @return DmlWrapper
+    */
     public static DmlWrapper createRelationship(npe4__Relationship__c[] Relationships) {
     	
     	DmlWrapper dmlWrapper = new DmlWrapper();
@@ -179,25 +216,26 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
             npe4__Relationship__c copy = new npe4__Relationship__c();              
             copy.npe4__Contact__c = r.npe4__RelatedContact__c;
             copy.npe4__RelatedContact__c = r.npe4__Contact__c;
-            copy.npe4__Status__c = r.npe4__Status__c;
             copy.npe4__ReciprocalRelationship__c = r.Id;
-            copy.npe4__Description__c = r.npe4__Description__c;
             copy.npe4__SYSTEM_SystemCreated__c = true;
             relationshipsToCreate.add(copy);
         }
         
         //evaluate and add the type
-        addType(Relationships, relationshipstoCreate);      
+        addType(Relationships, relationshipsToCreate);
+        syncRelationshipFields(Relationships, relationshipsToCreate);
         dmlWrapper.objectsToInsert.addAll(relationshipsToCreate);
         //inspectSaveResults(sr, relationshipsToCreate);
         
         return dmlWrapper;
     }
 
-    /// <name> updateRelationship </name>
-    /// <summary> Updates the Status and/or Type of a relationship After its reciprocal has been updated </summary>
-    /// <param name="Relationships">  </param>
-    /// <param name="oldRelationships">  </param>
+    /*******************************************************************************************************
+    * @description Updates the Status and/or Type of a relationship After its reciprocal has been updated 
+    * @param Relationships  
+    * @param oldRelationships 
+    * @return DmlWrapper
+    */ 
     public static DmlWrapper updateRelationship(npe4__Relationship__c[] Relationships, 
     npe4__Relationship__c[] oldRelationships){
     	
@@ -210,21 +248,20 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
 
         for(npe4__Relationship__c r : Relationships) {
         	
-            //SWA 2009-05-13 removed a duplicate check for change to npe4__Status__c from this OR statement
-            if ((r.npe4__Status__c != oldRelationships[counter].npe4__Status__c 
-            || r.npe4__Type__c != oldRelationships[counter].npe4__Type__c 
-            || r.npe4__Description__c != oldRelationships[counter].npe4__Description__c) 
-            && r.npe4__ReciprocalRelationship__c != null) {
-            	UTIL_Debug.debug('****Creating relationship in updateRelationship method');
+            if (needsUpdate(r, oldRelationships[counter])) {
+               	UTIL_Debug.debug('****Creating relationship in updateRelationship method');
                 npe4__Relationship__c copy = new npe4__Relationship__c(Id=r.npe4__ReciprocalRelationship__c);
                 
                 //SWA 2009-05-13 - only attempt to modify the Contact field if the Related Contact  has changed
                 if(oldRelationships[counter].npe4__RelatedContact__c!=r.npe4__RelatedContact__c) {
                     copy.npe4__Contact__c = r.npe4__RelatedContact__c;
                 }
-                copy.npe4__Status__c = r.npe4__Status__c;
-                copy.npe4__Description__c = r.npe4__Description__c;
-                
+
+                //synchronize fields if they need it
+                if (!syncFields.isEmpty()) {
+                    syncRelationshipFields(r,copy);
+                }
+
                 //only recalculate type on reciprocal if the original type has changed
                 if (r.npe4__Type__c != oldRelationships[counter].npe4__Type__c) {
                     relationshipsTypesToUpdate.add(copy);
@@ -248,6 +285,11 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
         return dmlWrapper;
     }
     
+    /*******************************************************************************************************
+    * @description Updates Type of a list of relationships based on reciprocal method and list settings 
+    * @param rList list of old Relationship records   
+    * @param rCopy List of SObjects (Relationships) being updated
+    * */ 
     public static void addType(list<npe4__Relationship__c> rList, List<SObject> rCopy) {
         
         npe4__Relationship_Settings__c rs = UTIL_CustomSettingsFacade.getRelationshipSettings();
@@ -256,7 +298,7 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
         integer counter = 0;            
             
         if (rs.npe4__Reciprocal_Method__c == 'List Setting'){            
-            map<string, npe4__Relationship_Lookup__c> rlMap = npe4__Relationship_Lookup__c.getAll().clone();
+            map<string, npe4__Relationship_Lookup__c> rlMap = UTIL_ListCustomSettingsFacade.getMapRelationshipLookupSettings().clone();
         
             //remove inactive values
             for (string s : rlMap.keySet()){
@@ -267,11 +309,13 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
             }
         
             list<id> rIDs = new list<id>();
-                
+
             for (npe4__Relationship__c r : rList){
             //    rIDs.add(r.npe4__RelatedContact__c);
-                rIDs.add(r.npe4__Contact__c);
-            }            
+                if (r.npe4__Contact__c != null) {
+                    rIDs.add(r.npe4__Contact__c);
+                }
+            }
             
             String query_string = 'select id, Salutation';            
             String gender_field = '';
@@ -286,7 +330,12 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
             map<id, Contact> cMap = new map<id,Contact>((List<Contact>)database.query(query_string));
             
             for(npe4__Relationship__c r : rList){
-                
+
+                // Skip any records where the related reciprical contact is null
+                if (r.npe4__Contact__c == null) {
+                    continue;
+                }
+
                 npe4__Relationship__c copy = (npe4__Relationship__c)rCopy[counter];
 
                 Contact relatedContact = cMap.get(r.npe4__Contact__c);
@@ -376,6 +425,49 @@ public class REL_Relationships_TDTM extends TDTM_Runnable {
                 counter++; 
             }   
         }
+    }
+
+    /*******************************************************************************************************
+    * @description Synchronize Relationship fields according to custom settings  
+    * @param sourceRel Relationship(s) whose fields are to be copied
+    * @param targetRel Relationship(s) whose fields are to be updated
+    ********************************************************************************************************/
+    public static void syncRelationshipFields(list<npe4__Relationship__c> sourceRel, List<SObject> targetRel) {
+        if (!syncFields.isEmpty()) {
+            Integer counter = 0;
+            for(npe4__Relationship__c r : sourceRel) {
+                npe4__Relationship__c copy = (npe4__Relationship__c)targetRel[counter];
+                syncRelationshipFields(r, copy);
+                counter++;
+            }
+        }
+    }
+
+    public static void syncRelationshipFields(npe4__Relationship__c sourceRel, npe4__Relationship__c targetRel) {
+            for (String f : syncFields) {
+                targetRel.put(f,sourceRel.get(f));
+            }
+    }    
+
+
+    /*******************************************************************************************************
+    * @description Utility method to determine if any synced fields have changed
+    * @param newRel The Relationship record with new field values
+    * @param oldRel The Relationship record with old field values 
+    ********************************************************************************************************/
+
+    private static Boolean needsUpdate(npe4__Relationship__c newRel, npe4__Relationship__c oldRel) {
+        if (newRel.npe4__ReciprocalRelationship__c != null) {
+            for (string f : syncFields) {
+                if (newRel.get(f) != oldRel.get(f)) {
+                    return true;
+                }
+            }
+            if (newRel.npe4__Type__c != oldRel.npe4__Type__c) {
+                return true;
+            }
+        } 
+        return false;
     }
     
     /*******************************************************************************************************

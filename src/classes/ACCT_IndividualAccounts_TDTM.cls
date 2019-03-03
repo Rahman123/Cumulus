@@ -55,7 +55,7 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
             OrgLanguage = UserInfo.getLocale();// [Select LanguageLocaleKey From Organization].LanguageLocaleKey;
         return OrgLanguage;             
     } set; }       
-        	
+            
     /*******************************************************************************************************
     * @description Trigger Handler on Contact that handles account management.  Depending on the Account
     * Model, creates a Household Account, One-to-One Account, or uses the Individual Bucket Account.
@@ -72,7 +72,7 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
         list<Contact> oldContacts = oldlist;
         
         DmlWrapper dmlWrapper = new DmlWrapper();
-    	   	
+               
         ContactsSettings = UTIL_CustomSettingsFacade.getContactsSettings();
             
             List<Contact> listContactNeedAccount = new List<Contact>();
@@ -86,6 +86,8 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
             map<Id, Contact> mapContactIdContactOwnerChange = new map<Id, Contact>();
             map<Id, Id> mapContactIdAccountIdOldMoveOpps = new map<Id, Id>();
             map<Id, Id> mapContactIdAccountIdNewMoveOpps = new map<Id, Id>();
+            Set<String> hhNamingFields = new HH_HouseholdNaming().getHouseholdNamingContactFields();
+
             
             if (triggerAction == TDTM_Runnable.Action.BeforeInsert || triggerAction == TDTM_Runnable.Action.BeforeUpdate) {                    
                 // need to query account fields we need to look at
@@ -93,17 +95,11 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                 for (Contact c : contacts) 
                     setAccountId.add(c.AccountId);
                 mapAccountIdAccount = new Map<Id,Account>([select Id, npe01__One2OneContact__c, npe01__SYSTEM_AccountType__c from Account where Id IN :setAccountId]);
-            } else if (triggerAction == TDTM_Runnable.Action.AfterInsert || triggerAction == TDTM_Runnable.Action.AfterUpdate) {
-               // requery to get correct Account values (and all the other fields we will look at)
-               string strSoql = 'select id,npe01__Private__c,AccountId,Account.npe01__SYSTEMIsIndividual__c,' +
-                    'Account.npe01__SYSTEM_AccountType__c,Account.npe01__One2OneContact__c,npe01__Organization_Type__c,Account.Name,' +
-                    'firstname, lastname, OwnerId, Salutation, npo02__Naming_Exclusions__c, npo02__Household_Naming_Order__c,' +
-                    'MailingStreet, MailingCity, MailingState, MailingPostalCode, MailingCountry, MailingLatitude, MailingLongitude, ' + 
-                    'OtherStreet, OtherCity, OtherState, OtherPostalCode, OtherCountry, OtherLatitude, OtherLongitude, '; 
-                if (ADDR_Addresses_TDTM.isStateCountryPicklistsEnabled)
-                    strSoql += 'MailingCountryCode, MailingStateCode, OtherCountryCode, OtherStateCode, ';
-                strSoql += 'Phone, Fax from Contact where Id IN :contacts';
-                contacts = database.query(strSoql);
+            } else if (triggerAction == TDTM_Runnable.Action.AfterInsert || triggerAction == TDTM_Runnable.Action.AfterUpdate || triggerAction == TDTM_Runnable.Action.AfterUndelete) {
+
+                // requery to get correct Account values (and all the other fields we will look at)
+                String soql = buildContactSoql(hhNamingFields);                
+                contacts = database.query(soql);
             }        
                         
             // AFTER DELETE
@@ -116,9 +112,9 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                     
                     // BEFORE INSERT
                     if (triggerAction == TDTM_Runnable.Action.BeforeInsert) {
-                    	// always clear this deprecated field to avoid confusing users.
-                    	c.npe01__SystemAccountProcessor__c = null;
-                    	
+                        // always clear this deprecated field to avoid confusing users.
+                        c.npe01__SystemAccountProcessor__c = null;
+                        
                         /* HH Account should be created if:
                             1. The account isn't set by the user
                             2. The npe01__Private__c checkbox isn't set by the user
@@ -152,8 +148,8 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                         }                                                
                     }
         
-                    // AFTER INSERT
-                    if (triggerAction == TDTM_Runnable.Action.AfterInsert) {
+                    // AFTER INSERT and AFTER UNDELETE
+                    if (triggerAction == TDTM_Runnable.Action.AfterInsert || triggerAction == TDTM_Runnable.Action.AfterUndelete) {
                         /*grab the Accounts that need to have the newly assigned Contact Id to them if:
                             1. If the contact is connected to an Account
                             2. The Contact is flagged as an individual
@@ -193,14 +189,18 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                         */
                         else if (CAO_Constants.isOneToOne() && c.npe01__Private__c != true && 
                             (c.AccountId == null || (mapAccountIdAccount.containsKey(c.AccountId) && mapAccountIdAccount.get(c.AccountId).npe01__SYSTEM_AccountType__c == CAO_Constants.ONE_TO_ONE_ORGANIZATION_TYPE)) ) {
-                            
+
                             // Avoid updating a contact with the 1:1 account of another contact  
-                            if (c.AccountId != null && mapAccountIdAccount.get(c.AccountId).npe01__One2OneContact__c != c.Id &&
+                            if (c.AccountId != null &&
+                                mapAccountIdAccount.get(c.AccountId).npe01__One2OneContact__c != c.Id &&
                                 mapAccountIdAccount.get(c.AccountId).npe01__One2OneContact__c != null &&
-                                // only do this fix if this update is currently happening.
-                                // this avoids an account merge from being undone by a later update to the contact
-                                c.AccountId != oldContacts[i].AccountId) {  
-                                c.AccountId = null;
+                                c.AccountId != oldContacts[i].AccountId) {
+
+                                // we need to know if this account change is due to an Account Merge, in which case we want to allow it.
+                                boolean isDeletedOldAccount = [select count() from Account where Id =: oldContacts[i].AccountId] == 0;
+                                if (!isDeletedOldAccount) {
+                                    c.AccountId = null;
+                                }
                             }
                             
                             if (c.AccountId == null)
@@ -257,13 +257,14 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                             }
                                                                                  
                            // HH Account didn't change, but it still might need renaming
-                        } else if (c.npe01__Organization_Type__c == CAO_Constants.HH_ACCOUNT_TYPE && needsHHAccountRename(c, oldContacts[i])) {
-                           listAccountIdHHToRename.add(c.AccountId);    
+                        } else if (c.npe01__Organization_Type__c == CAO_Constants.HH_ACCOUNT_TYPE && 
+                                needsHHAccountRename(hhNamingFields, c, oldContacts[i])) {
+                            listAccountIdHHToRename.add(c.AccountId);    
                         }  
                         
                         // check for ownership changes
                         if (c.OwnerId != oldContacts[i].OwnerId) {
-                        	mapContactIdContactOwnerChange.put(c.Id, c);
+                            mapContactIdContactOwnerChange.put(c.Id, c);
                         }                     
                     }
                     i += 1;
@@ -289,7 +290,7 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                 updateAccountPrimaryContact(mapAccountIdContactId, dmlWrapper);
             }
             if (mapContactIdAccountIdNewMoveOpps.size() > 0) {
-            	moveOppsToContactAccount(mapContactIdAccountIdNewMoveOpps, mapContactIdAccountIdOldMoveOpps, null);
+                moveOppsToContactAccount(mapContactIdAccountIdNewMoveOpps, mapContactIdAccountIdOldMoveOpps, null);
             }
             if (listAccountIdHHToUpdate.size() > 0) {
                 updateHHAccount(listAccountIdHHToUpdate, dmlWrapper);
@@ -298,14 +299,46 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                 renameHHAccounts(listAccountIdHHToRename);    
             }
             if (mapContactIdContactOwnerChange.size() > 0) {
-            	updateOwners(mapContactIdContactOwnerChange, dmlWrapper);
+                updateOwners(mapContactIdContactOwnerChange, dmlWrapper);
             }
             if (listContactAccountDelete.size() > 0) {
                 // check all old accounts to delete is they are left hanging around
                 deleteContactAccountsIfEmpty(listContactAccountDelete, dmlWrapper);
             }
             
-    return dmlWrapper;
+        return dmlWrapper;
+    }
+
+    /*******************************************************************************************************
+    * @description Builds SOQL on Contact Sobject. Fields include Household Naming Settings Format fields.
+    * @param hhNamingFields Household Naming Settings Format field names
+    * @return String SOQL
+    */ 
+    @TestVisible
+    private String buildContactSoql(Set<String> hhNamingFields) {
+        List<String> selectFields = new List<String>{
+            'Id', 'npe01__Private__c', 'AccountId', 'Account.npe01__SYSTEMIsIndividual__c',
+            'Account.npe01__SYSTEM_AccountType__c', 'Account.npe01__One2OneContact__c', 'npe01__Organization_Type__c', 'Account.Name',
+            'FirstName', 'LastName', 'OwnerId', 'Salutation', 'npo02__Naming_Exclusions__c', 'npo02__Household_Naming_Order__c',
+            'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'MailingCountry', 'MailingLatitude', 'MailingLongitude',
+            'OtherStreet', 'OtherCity', 'OtherState', 'OtherPostalCode', 'OtherCountry', 'OtherLatitude', 'OtherLongitude',
+            'Phone', 'Fax'
+        };
+        
+        if (ADDR_Addresses_TDTM.isStateCountryPicklistsEnabled) {
+            selectFields.add('MailingCountryCode');
+            selectFields.add('MailingStateCode');
+            selectFields.add('OtherCountryCode'); 
+            selectFields.add('OtherStateCode');
+        }
+
+        selectFields.addAll(hhNamingFields);
+
+        return new UTIL_Query()
+            .withSelectFields(selectFields)
+            .withFrom('Contact')
+            .withWhere('Id IN :contacts')
+            .build();
     }
 
     /*******************************************************************************************************
@@ -425,20 +458,14 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
     */ 
     private void attachToBucketAccount(Contact[] contacts)
     {
-        //grab the first Account that is named Individual
-        List<Account> individuals = [Select Id from Account where name = :CAO_Constants.BUCKET_ACCOUNT_NAME ORDER BY CreatedDate Desc Limit 1];
+        Id individualAccountId = CAO_Constants.getIndividualAccountId();
         
-        Id individualAccountId = CAO_Constants.GetIndividualAccountId();
-        
-        if (individuals.size() > 0)
-        {
-            for(Contact c : contacts)
-            {
+        if (individualAccountId != null) {
+            for (Contact c : contacts) {
                 //connect all Contacts to the bucket Account
                 c.AccountId = individualAccountId;
             }
-        } else
-        {
+        } else {
             //if there is no bucket Account, the bucket model won't function unless we create one
             Account individual = new Account();
             individual.Name = CAO_Constants.BUCKET_ACCOUNT_NAME;
@@ -446,10 +473,9 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
             individual.npe01__SYSTEMISINDIVIDUAL__c = true;
             //individual.Type = CAO_Constants.BUCKET_ORGANIZATION_TYPE;
             individual.npe01__SYSTEM_AccountType__c = CAO_Constants.BUCKET_ORGANIZATION_TYPE;
-            insert individual;
+            UTIL_DMLService.insertRecord(individual);
 
-            for(Contact c : contacts)
-            {
+            for (Contact c : contacts) {
                 //connect Contact to bucket Account
                 c.AccountId = individual.Id;
             }
@@ -461,7 +487,7 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
     * @return Id. if none is explicitly specified, returns null.
     */ 
     public static ID rtIdForNewAccount() {
-    	return rtIdForAccountModel(CAO_Constants.isHHAccountModel());
+        return rtIdForAccountModel(CAO_Constants.isHHAccountModel());
     }
 
     /*******************************************************************************************************
@@ -503,12 +529,13 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
             }
         }
         // get all the Accounts that are connected to the existing Contacts
-        for (Account acc : [Select Id, npe01__One2OneContact__c, npe01__SYSTEM_AccountType__c from Account where npe01__One2OneContact__c in :contactIds]) {
+        for (Account acc : [SELECT Id, npe01__One2OneContact__c, npe01__SYSTEM_AccountType__c FROM Account
+                WHERE npe01__One2OneContact__c IN :contactIds]) {
             mapContactIdAccount.put(acc.npe01__One2OneContact__c, acc);
         }
         
         List<Account> accountInserts = new List<Account>();
-        ID rtIdAcccount = rtIdForNewAccount();
+        Id rtIdAcccount = rtIdForNewAccount();
         
         for (Contact c : contacts) {
             // if we found an Account already connected to this Contact, connect the Contact to that Account if it
@@ -526,16 +553,18 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
                 // construct the Account name
                 a.Name = CAO_Constants.isHHAccountModel() ? strNameHHAccountForContact(c) : strNameOne2OneAccountForContact(c);
                 
-                //connect the Account to the Contact for 1:1 and HHAccount
+                // connect the Account to the Contact for 1:1 and HHAccount
                 if (c.Id != null) {
                     a.npe01__One2OneContact__c = c.Id;
                 }
                 a.Phone = c.Phone;
                 a.Fax = c.Fax;
+                a.OwnerId = c.OwnerId;
                 // only set account's billing address if address management is off.
                 // otherwise, we'll let ADDR_Contact_TDTM push the new address into the account.
-                if (!CAO_Constants.isHHAccountModel() || UTIL_CustomSettingsFacade.getContactsSettings().Household_Account_Addresses_Disabled__c)
+                if (!CAO_Constants.isHHAccountModel() || UTIL_CustomSettingsFacade.getContactsSettings().Household_Account_Addresses_Disabled__c) {
                     ADDR_Addresses_TDTM.copyAddressStdSObj(c, 'Mailing', a, 'Billing');
+                }
                 ADDR_Addresses_TDTM.copyAddressStdSObj(c, 'Other', a, 'Shipping');
 
                 a.npe01__SYSTEM_AccountType__c = CAO_Constants.isHHAccountModel() ? CAO_Constants.HH_ACCOUNT_TYPE : CAO_Constants.ONE_TO_ONE_ORGANIZATION_TYPE;
@@ -553,9 +582,19 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
             // with current TDTM design, we can't use dmlWrapper
             // because we need to get the new AccountID's into the Contacts.
 
-            // we do want it to be all or nothing, so errors won't get lost.
-            insert(accountInserts);
-                        
+            // identify the specific records that had the problem, and don't fail the whole batch
+            List<Database.SaveResult> insertResults = UTIL_DMLService.insertRecords(accountInserts, false);
+            for (integer i = 0; i < insertResults.size(); i++) {
+                Database.SaveResult sr = insertResults[i];
+                if (!sr.isSuccess()) {
+                    for (Database.Error err : sr.getErrors()) {
+                        accountInserts[i].addError(err.getMessage());
+                        Contact con = listContactNewAcct[i];
+                        con.addError(string.format(label.conFailedAccountCreate, new string[]{con.Firstname, con.Lastname, err.getMessage()}));
+                    }
+                }
+            }
+                                    
             // now update each contact's accountId
             Integer i = 0;
             for (Contact c : listContactNewAcct) {
@@ -603,7 +642,7 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
         }   
 
         if (listAccount.size() > 0) {
-        	dmlWrapper.objectsToUpdate.addAll((list<SObject>)listAccount);
+            dmlWrapper.objectsToUpdate.addAll((list<SObject>)listAccount);
             //Database.SaveResult[] lsr = Database.update(listAccount, false);
         }
     }
@@ -644,8 +683,12 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
         }
         // delete the accounts
         if (accountsForDeletion.size() > 0) {
-        	dmlWrapper.objectsToDelete.addAll(accountsForDeletion);           
-            //delete accountsForDeletion;
+            /*This is a bad strategy as it leaves the deleted contact unrecoverable from the recycle bin.
+            **Leaving an orphaned account is less of an issue than unrecoverable data, and that is solved
+            **by the contact delete button override.
+            */
+
+            //dmlWrapper.objectsToDelete.addAll(accountsForDeletion);
         }
         // update any HH accounts that just lost a contact
         if (listAccountIdUpdate.size() > 0)
@@ -660,31 +703,48 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
     */ 
     private void updateOwners(map<Id, Contact> mapContactIdContactOwnerChange, DmlWrapper dmlWrapper) {        
         if (mapContactIdContactOwnerChange.size() > 0) {
-            list<Account> listAccToUpdate = new list<Account>();
-            set<Id> setAccId = new set<Id>();
+            Map<Id, Account> allAccounts = new Map<Id, Account>();
+            Map<Id, Account> accountsToUpdate = new Map<Id, Account>();
+
             for (Contact con : mapContactIdContactOwnerChange.values()) {
-            	setAccId.add(con.AccountId);
+                allAccounts.put(con.AccountId, null);
             }
                        
-            list<Account> listAcc = [Select Id, npe01__SYSTEM_AccountType__c, npe01__One2OneContact__c, OwnerId, (select Id from Contacts limit 2) from Account 
-                where Id IN :setAccId];
+            allAccounts = new Map<Id, Account>(
+                [SELECT Id, npe01__SYSTEM_AccountType__c, npe01__One2OneContact__c, OwnerId, 
+                    (SELECT Id FROM Contacts limit 2) 
+                 FROM Account WHERE Id IN :allAccounts.keySet()]
+            );
             
-            for (Account acc : listAcc) {
+            for (Account acc : allAccounts.values()) {
                 // only consider 1:1 and HH Accounts
                 if (acc.npe01__SYSTEM_AccountType__c == CAO_Constants.ONE_TO_ONE_ORGANIZATION_TYPE || acc.npe01__SYSTEM_AccountType__c == CAO_Constants.HH_ACCOUNT_TYPE) {                    
                     // if there is only 1 contact associated with this account
                     if (acc.Contacts.size() == 1 && acc.npe01__One2OneContact__c != null) {
-                    	Contact c = mapContactIdContactOwnerChange.get(acc.npe01__One2OneContact__c);
-                    	Id ownerIdContact = (c != null ? c.OwnerId : null);
-                    	if (acc.OwnerId != ownerIdContact) {
-                    		acc.OwnerId = ownerIdContact;
-                    		listAccToUpdate.add(acc);
-                    	}
+                        Contact c = mapContactIdContactOwnerChange.get(acc.npe01__One2OneContact__c);
+                        Id ownerIdContact = (c != null ? c.OwnerId : null);
+                        if (acc.OwnerId != ownerIdContact) {
+                            acc.OwnerId = ownerIdContact;
+                            accountsToUpdate.put(acc.id, acc);
+                        }
                     }
                 }   
             }
-            // add all accounts needing updating to our list
-            dmlWrapper.objectsToUpdate.addAll((List<SObject>)listAccToUpdate);                        
+
+            //update existing dmlWrapper objects with accounts already in the list
+            //avoids "duplicate id in list" errors updating the same account twice
+            for (sObject dmlObj : dmlWrapper.objectsToUpdate) {
+                Id objId = (Id) dmlObj.get('id');
+                if (accountsToUpdate.containsKey(objId)) {
+                    dmlObj.put('OwnerId', accountsToUpdate.get(objId).OwnerId);
+                    accountsToUpdate.remove(objId);
+                }
+            }
+
+            // add the rest of the accounts that weren't already in the update list
+            if (!accountsToUpdate.isEmpty()) {
+                dmlWrapper.objectsToUpdate.addAll((List<SObject>)accountsToUpdate.values());
+            }
         }
     }
     
@@ -723,7 +783,7 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
         if (listOpp.size() > 0) {
             // since our rollup code isn't using dmlWrapper, some callers want us to commit now
             if (dmlWrapper == null)
-                update listOpp;
+                UTIL_DMLService.updateRecords(listOpp);
             else
                 dmlWrapper.objectsToUpdate.addAll((list<SObject>)listOpp);
         }
@@ -740,12 +800,14 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
             return true;
         if(conNew != null && conOld == null)
             return true;
-        if(conNew.FirstName == null) conNew.FirstName = '';
-        if(conNew.LastName == null) conNew.LastName = '';
+        String newFirst = conNew.FirstName == null ? '' : conNew.FirstName;
+        String oldFirst = conOld.FirstName == null ? '' : conOld.FirstName;
+        String newLast = conNew.LastName == null ? '' : conNew.LastName;
+        String oldLast = conOld.LastName == null ? '' : conOld.LastName;
         
         return (conNew.AccountId != conOld.AccountId ||
-                !conNew.FirstName.equals(conOld.FirstName) ||
-                !conNew.LastName.equals(conOld.LastName) ||
+                !newFirst.equals(oldFirst) ||
+                !newLast.equals(oldLast) ||
                 conNew.MailingStreet != conOld.MailingStreet ||
                 conNew.MailingCity != conOld.MailingCity ||
                 conNew.MailingState != conOld.MailingState ||
@@ -761,25 +823,56 @@ public class ACCT_IndividualAccounts_TDTM extends TDTM_Runnable {
     }
  
     /*******************************************************************************************************
-    * @description returns whether changes in the contact require a rename of a HH Account 
+    * @description returns whether changes in the contact require a rename of a HH Account
+    * @param hhNamingFields the set of fields used in the namespec
     * @param conNew the new version of the Contact
     * @param conOld the old version of the Contact
     * @return boolean
-    */ 
-    private boolean needsHHAccountRename(Contact conNew, Contact conOld) {          
-        if(conNew == null && conOld != null)
+    */
+    private boolean needsHHAccountRename(Set<String> hhNamingFields, Contact conNew, Contact conOld) {
+        if (conNew == null && conOld != null)
             return true;
-        if(conNew != null && conOld == null)
+        if (conNew != null && conOld == null)
             return true;
-        if(conNew.FirstName == null) conNew.FirstName = '';
-        if(conNew.LastName == null) conNew.LastName = '';
+        if (conNew.FirstName == null) conNew.FirstName = '';
+        if (conNew.LastName == null) conNew.LastName = '';
         
-        return (!conNew.Firstname.equals(conOld.Firstname) ||
-                !conNew.Lastname.equals(conOld.Lastname) ||
-                conNew.Salutation != conOld.Salutation ||
-                conNew.npo02__Household_Naming_Order__c != conOld.npo02__Household_Naming_Order__c ||
-                conNew.npo02__Naming_Exclusions__c != conOld.npo02__Naming_Exclusions__c);
-    }   
+        // check all household naming fields for changes
+        for(String fieldName : hhNamingFields) {
+            string strName;
+            string strNameOld;
+            
+            //separate cross object references, i.e. account.name
+            list<string> splitField = (fieldName.split('\\.',0));
+            if (splitField.size() > 1) {
+                SObject sobj = conNew.getSobject(splitField[0]);
+                if (sobj != null) {
+                    strName = sobj.Id;
+                }
+                sobj = conOld.getSobject(splitField[0]);
+                if (sobj != null) {
+                    strNameOld = sobj.Id;
+                }
+            } else {
+                strName = String.valueOf(conNew.get(fieldName));
+                strNameOld = String.valueOf(conOld.get(fieldName));
+            }
+
+            // make sure to use case sensitive comparison
+            if (strName == null)
+                strName = '';
+            if (strNameOld == null)
+                strNameOld = '';
+            if (!strName.equals(strNameOld)) {
+                return true;
+            }
+        }
+        if (conNew.npo02__Household_Naming_Order__c != conOld.npo02__Household_Naming_Order__c ||
+            conNew.npo02__Naming_Exclusions__c != conOld.npo02__Naming_Exclusions__c) {
+            return true;
+        }
+        return false;
+    }
     
     /*******************************************************************************************************
     * @description returns whether changes in the contact require an address change in the HH Account 

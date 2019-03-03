@@ -36,12 +36,19 @@
 
 @isTest
 public class UTIL_UnitTestData_TEST { 
+    /** @description A mock Account Id .*/
+    public static final String MOCK_ACCOUNT_ID = Account.sObjectType.getDescribe().getKeyPrefix() + '000000000001AAA';
+    
+    public static final String PROFILE_STANDARD_USER = 'Standard User';
+    public static final String PROFILE_READONLY_USER = 'Read Only';
 
 // create data for use in unit tests
 // should not be referenced by production code
     public static string closedWonStage;
     public static string closedLostStage;
     public static string openStage;
+    public static string closedTaskStatus;
+    public static string openTaskStatus;
     
     public static String getClosedWonStage(){
         if (closedWonStage == null){
@@ -84,6 +91,34 @@ public class UTIL_UnitTestData_TEST {
         
         return openStage;
     }
+
+    public static String getClosedTaskStatus(){
+        if (closedTaskStatus == null){
+            List<TaskStatus> closedTaskStatuses = [SELECT masterlabel FROM TaskStatus WHERE isClosed = true];
+            
+            if(closedTaskStatuses.size()>0){
+                closedTaskStatus = closedTaskStatuses[0].masterlabel;
+            } else {
+                closedTaskStatus = '';
+            }
+        }
+        
+        return closedTaskStatus;
+    }
+
+    public static String getOpenTaskStatus(){
+        if (openTaskStatus == null){
+            List<TaskStatus> openTaskStatuses = [SELECT masterlabel FROM TaskStatus WHERE isClosed = false];
+            
+            if(openTaskStatuses.size()>0){
+                openTaskStatus = openTaskStatuses[0].masterlabel;
+            } else {
+                openTaskStatus = '';
+            }
+        }
+        
+        return openTaskStatus;
+    }
     
     public static Contact getContact() {
     	return new Contact (
@@ -113,49 +148,33 @@ public class UTIL_UnitTestData_TEST {
                 npe01__PreferredPhone__c = CAO_Constants.CONTACT_PREFERRED_PHONE_FOR_TESTS,
                 OtherCity = 'Seattle'
             );
+            //since we're running rollup code on a manually created contacts in RLLP_OppRollup_TEST, we have to manually set currency field in multicurrency
+            if (RLLP_OppRollup_UTIL.isMultiCurrency()) {
+                newCon.put(RLLP_OppRollup_UTIL.mcFieldValues.get('Contact'), RLLP_OppRollup_UTIL.currCorporate);
+            }
+
             ContactsToAdd.add (newCon);
         }
         
+
         // testing doing the insert in the calling code - will maybe reinstate this
         //insert ContactsToAdd;
         
         return ContactsToAdd;
     }
-    /*
-    public static List<Contact> CreateMultipleTestContactsInHouseholds (List<Contact> firstContactList) {
-        
-        List<contact> ContactsToAdd = New List<contact> ();
-        
-        for (integer i=0;i<firstContactList.size();i++) {
-            Contact newCon = New Contact (
-                FirstName= CAO_Constants.CONTACT_FIRSTNAME_FOR_TESTS + i,
-                LastName= CAO_Constants.CONTACT_LASTNAME_FOR_TESTS,
-                npe01__Private__c=false,
-                npe01__WorkEmail__c = CAO_Constants.CONTACT_EMAIL_FOR_TESTS, 
-                npe01__Preferred_Email__c = CAO_Constants.CONTACT_PREFERRED_EMAIL_FOR_TESTS,
-                npe01__WorkPhone__c = CAO_Constants.CONTACT_PHONE_FOR_TESTS,
-                npe01__PreferredPhone__c = CAO_Constants.CONTACT_PREFERRED_PHONE_FOR_TESTS,
-                OtherCity = 'Seattle',
-                Household__c = firstContactList[i].Household__c
-            );
-            ContactsToAdd.add (newCon);
-        }
-        
-        // testing doing the insert in the calling code - will maybe reinstate this
-        //insert ContactsToAdd;
-        
-        return ContactsToAdd;
-    }
-    */
 
     public static List<Opportunity> OppsForContactList (List<Contact> Cons, id CampId, string Stage, date Close, double Amt, string rectype, string oppType) {
+        id rtid = UTIL_RecordTypes.GetRecordTypeId (Opportunity.sObjectType,rectype);
+        return OppsForContactListByRecTypeId(Cons, CampId, Stage, Close, Amt, rtid, oppType);
+    }
+
+    public static List<Opportunity> OppsForContactListByRecTypeId (List<Contact> Cons, id CampId, string Stage, date Close, double Amt, Id rtid, string oppType) {
      
         // given a List of Contacts,
         // add one Opp per contact w/ the specified data
         // TBD should allow specifying rectype (optional)
     
         List<Opportunity> OppsToAdd = new List<Opportunity> ();
-        id rtid = UTIL_RecordTypes.GetRecordTypeId ('Opportunity',rectype);
         UTIL_Debug.debug('recordtypeintest: ' + rtid);
 
         for ( Contact thisCon : Cons ) {
@@ -175,17 +194,24 @@ public class UTIL_UnitTestData_TEST {
         }
         return oppsToAdd;
     }
-    
+
     /*******************************************************************************************************
     * @description Create an Opportunity for each Contact, using their Account as the Opportunity's Account.
     */
     public static List<Opportunity> OppsForContactWithAccountList (List<Contact> Cons, id CampId, string Stage, date Close, double Amt, string rectype, string oppType) {
+        id rtid = UTIL_RecordTypes.GetRecordTypeId (Opportunity.sObjectType,rectype);
+        return OppsForContactWithAccountListByRecTypeId(Cons, CampId, Stage, Close, Amt, rtid, oppType);
+    }
+
+    /*******************************************************************************************************
+    * @description Create an Opportunity for each Contact, using their Account as the Opportunity's Account.
+    */
+    public static List<Opportunity> OppsForContactWithAccountListByRecTypeId (List<Contact> Cons, id CampId, string Stage, date Close, double Amt, Id rtid, string oppType) {
      
         // given a List of Contacts,
         // add one Opp per contact w/ the specified data
     
         List<Opportunity> OppsToAdd = new List<Opportunity> ();
-        id rtid = UTIL_RecordTypes.GetRecordTypeId ('Opportunity',rectype);
         UTIL_Debug.debug('recordtypeintest: ' + rtid);
 
         for ( Contact thisCon : Cons ) {
@@ -208,12 +234,16 @@ public class UTIL_UnitTestData_TEST {
     }
 
     public static List<Opportunity> OppsForAccountList (List<Account> listAcc, id CampId, string Stage, date Close, double Amt, string rectype, string oppType) {
+        id rtid = UTIL_RecordTypes.GetRecordTypeId (Opportunity.sObjectType,rectype);
+        return OppsForAccountListByRecTypeId(listAcc, CampId, Stage, Close, Amt, rtid, oppType);
+    }
+
+    public static List<Opportunity> OppsForAccountListByRecTypeId (List<Account> listAcc, id CampId, string Stage, date Close, double Amt, Id rtid, string oppType) {
      
         // given a List of Accounts,
         // add one Opp per Account w/ the specified data
     
         List<Opportunity> OppsToAdd = new List<Opportunity> ();
-        id rtid = UTIL_RecordTypes.GetRecordTypeId ('Opportunity',rectype);
         UTIL_Debug.debug('recordtypeintest: ' + rtid);
 
         for (Account acc : listAcc) {
@@ -234,7 +264,7 @@ public class UTIL_UnitTestData_TEST {
         return oppsToAdd;
     }
 
-    public static List<Account> CreateMultipleTestAccounts (integer n, string strType) {
+    public static List<Account> createMultipleTestAccounts (integer n, string strType) {
         
         List<Account> AcctsToAdd = New List<Account> ();
         
@@ -255,6 +285,46 @@ public class UTIL_UnitTestData_TEST {
     }
 
     /**
+     * @description Create Engagement Plan Templates for unit testing.
+     * @param n The number of Engagement Plan Templates to be created
+     * @return List of Engagement Plan Templates
+     */
+    public static List<Engagement_Plan_Template__c> createEPTemplates (integer n) {
+        // Holds the list of EP Templates to be returned
+        List<Engagement_Plan_Template__c> EPTemplatesToAdd = New List<Engagement_Plan_Template__c>();
+        
+        for (integer i=0 ;i<n; i++) {
+            EPTemplatesToAdd.add(new Engagement_Plan_Template__c(Name = 'Test ' + i));
+        }
+        
+        return EPTemplatesToAdd;
+    }
+
+    /**
+     * @description Create Engagement Plan Tasks for unit testing.
+     * @param n The number of Engagement Plan Tasks per Template to be created
+     * @param listEPTemplates The templates the EP Tasks will belong to
+     * @return List of Engagement Plan Templates
+     */
+    public static List<Engagement_Plan_Task__c> createEPTasksForTemplates (integer n, List<Engagement_Plan_Template__c> listEPTemplates) {
+        // Holds the list of EP Tasks to be returned
+        List<Engagement_Plan_Task__c> EPTasksToAdd = New List<Engagement_Plan_Task__c>();
+        
+        for (Engagement_Plan_Template__c epTemplate : listEPTemplates) {
+            for (integer i=0 ;i<n; i++) {
+                EPTasksToAdd.add(
+                    new Engagement_Plan_Task__c(
+                    Engagement_Plan_Template__c = epTemplate.Id,
+                    Priority__c = 'Medium'
+                    )
+                );
+            }
+        }
+        
+        return EPTasksToAdd;
+    }
+
+    /**
      * @description Create a new user for unit testing.
      * @param strUsername The username for the user to be created
      * @param strRolename The name of the UserRole to associate with the user (will be created if does not exist)
@@ -264,7 +334,7 @@ public class UTIL_UnitTestData_TEST {
         Profile p = [
             SELECT Id
             FROM Profile
-            WHERE Name='Standard User'
+            WHERE Name = :PROFILE_STANDARD_USER
         ];
 
         UserRole r;
@@ -304,6 +374,7 @@ public class UTIL_UnitTestData_TEST {
                 UserRoleId = r.Id,
                 Username = strUsername
             );
+
             insert u;
         }
         return u;
@@ -332,6 +403,108 @@ public class UTIL_UnitTestData_TEST {
         }
 
         return u;
+    }
+
+    /**
+     * @description Create a User having Standard User profile assigned
+     * @return User
+     */
+    public static User createStandardProfileUser() {
+        return createUser(PROFILE_STANDARD_USER);
+    }
+
+    /**
+     * @description Create a User having specified profile assigned
+     * @param profileName Profile Name
+     * @return Inserted User
+     */
+    public static User createUser(String profileName) {
+        User u = createUserWithoutInsert(profileName);
+
+        //create the user
+        System.runAs(u) {}
+
+        return u;      
+    } 
+
+    /**
+     * @description Build a User having specified profile assigned, but do not insert
+     * @param profileName Profile Name
+     * @return User
+     */
+    public static User createUserWithoutInsert(String profileName) {
+        return buildUser(buildUniqueLastName(), profileName);
+    }
+
+    /**
+     * @description Construct a unique last name to be assigned to a User
+     * @return String
+     */
+    static String buildUniqueLastName() {
+        return UserInfo.getOrganizationId() +
+            String.valueof(Datetime.now()).replace(' ','').replace(':','').replace('-','') +
+            Integer.valueOf(math.rint(math.random()*2000000));
+    }
+
+    /**
+     * @description Set new User fields
+     * @param lastName Last Name
+     * @param profileName Profile Name
+     * @return User
+     */
+    static User buildUser(String lastName, String profileName) {
+        Profile p = [SELECT Id FROM Profile WHERE name = :profileName];
+        String alias = lastName.replaceAll(' ', '').leftPad(8, '0').right(8);
+        String email = lastName.left(70) + '@email.npsp';
+
+        return new User(
+            LastName = lastName, 
+            Email = email, 
+            ProfileId = p.id,
+            UserName = email,
+            Alias = alias, 
+            TimeZoneSidKey = 'America/Los_Angeles',
+            LocaleSidKey = 'en_US', 
+            LanguageLocaleKey = 'en_US',
+            EmailEncodingKey = 'ISO-8859-1'
+        );
+    }
+
+    /**
+     * @description Assert a Visualforce page has an error message displayed
+     * @param expectedMsg Expected error message
+     * @return void
+     */
+    public static void assertPageHasError(String expectedMsg) {
+        assertPageHasMessage(expectedMsg, ApexPages.Severity.ERROR);
+    }
+
+    /**
+     * @description Assert a Visualforce page has a message displayed
+     * @param expectedMsg Expected error message
+     * @param expectedSeverity Expected severity level
+     * @return void
+     */
+    public static void assertPageHasMessage(String expectedMsg, ApexPages.Severity expectedSeverity) {
+        ApexPages.Message[] msgs = ApexPages.getMessages();
+
+        System.assert(
+            ApexPages.hasMessages(expectedSeverity), 
+            'Expected page to contain at least one error message. Messages: ' + msgs
+        );
+ 
+        for (ApexPages.Message msg : msgs) {
+            if (msg.getSummary().contains(expectedMsg) && msg.getSeverity() == expectedSeverity) {
+                return;       
+            }
+        }
+
+        System.assert(false, 
+            String.format(
+                'Cannot find "{0}" in the page messages: ' + msgs,
+                new String[] { expectedMsg }
+            )
+        );
     }
 
     public static list<Account> listAccT;
@@ -365,10 +538,7 @@ public class UTIL_UnitTestData_TEST {
                 con.MailingCity = 'City' + iUnique + iCon;
             }
         }        
-        ADDR_Addresses_TDTM.hasRunAddrTrigger = false;
-        insert listConT;        
-        // clear our triggers recursion prevention since we are starting a new test
-        ADDR_Addresses_TDTM.hasRunAddrTrigger = false;
+        insert listConT;
     }
 
     private static testMethod void testCreateNewUserWithDefaultRole() {
@@ -383,7 +553,7 @@ public class UTIL_UnitTestData_TEST {
             WHERE Id = :returnedUser.Id
         ];
 
-        System.assertEquals(randomUsername, queriedUser.Username);
+        System.assert(randomUsername.equalsIgnoreCase(queriedUser.Username));
         System.assertEquals('COO', queriedUser.UserRole.Name);
     }
 
@@ -404,8 +574,8 @@ public class UTIL_UnitTestData_TEST {
             WHERE Id = :returnedUser.Id
         ];
 
-        System.assertEquals(randomUsername, queriedUser.Username);
-        System.assertEquals(randomRoleName, queriedUser.UserRole.Name);
+        System.assert(randomUsername.equalsIgnoreCase(queriedUser.Username));
+        System.assert(randomRoleName.equalsIgnoreCase(queriedUser.UserRole.Name));
     }
 
     private static testMethod void testCreateNewInactiveUserForTests() {
@@ -423,47 +593,239 @@ public class UTIL_UnitTestData_TEST {
         System.assertEquals(false, queriedUser.IsActive);
     }
 
-/*
-        public static List<Opportunity> OppsForAccountList (List<Account> Accts, id CampId, string Stage, date Close, double Amt, string rectype) {
-    
-        // given a List of accounts,
-        // add one Opp per acct w/ the specified data
-    
-        List<Opportunity> OppsToAdd = new List<Opportunity> ();
-        
-        // look up the id for the specified rectype
-        id rtid = UTIL_RecordTypes.GetRecordTypeId ('Opportunity',rectype);
-        
-        for ( Account thisAcct : Accts) {
-            Opportunity newOpp = New Opportunity (
-                AccountId = thisAcct.id,
-                Name = 'Test Opp ' + thisAcct.Name,
-                Amount = Amt,
-                CloseDate = Close,
-                StageName = Stage,
-                CampaignId = CampId,
-                RecordTypeId = rtid
-            );  
-            OppsToAdd.add (newOpp);
-        }
-        
-        return OppsToAdd;
-        
+    /*********************************************************************************************************
+    * @description Turns on Automatic Household Naming
+    * @return void
+    **********************************************************************************************************/
+    public static void turnOnAutomaticHHNaming() {
+        setupAutomaticHHNaming(true);
     }
-    */
-    
-    
-  /*  
-    public Static CampaignMember CreateCampaignMember (id CampId, id ConId, string CMStatus) {
-    
-        CampaignMember newCM = new CampaignMember (
-            CampaignId = CampId,
-            ContactId = ConId,
-            Status = CMStatus
+
+    /*********************************************************************************************************
+    * @description Turns off Automatic Household Naming
+    * @return void
+    **********************************************************************************************************/
+    public static void turnOffAutomaticHHNaming() {
+        setupAutomaticHHNaming(false);
+    }
+
+    /*********************************************************************************************************
+    * @description Configures Household Settings' Automatic Household Naming field
+    * @param isOn Automatic Household Naming is turned on when parameter is true, otherwise, the settings is turned off
+    * @return void
+    **********************************************************************************************************/
+    public static void setupAutomaticHHNaming(Boolean isOn) {
+        UTIL_CustomSettingsFacade.getHouseholdsSettingsForTests(
+            new npo02__Households_Settings__c (
+                npo02__Household_Rules__c = HH_Households.NO_HOUSEHOLDS_PROCESSOR,
+                npo02__Advanced_Household_Naming__c = isOn
+            )
         );
-        
-        insert newCM;
-        return newCm;           
     }
-*/
+
+    /*********************************************************************************************************
+    * @description Configures Household Naming Settings with invalid Name and Greetings formats
+    * @return Household_Naming_Settings__c
+    **********************************************************************************************************/
+    public static Household_Naming_Settings__c setupInvalidHHNamingSettings() {
+        return setupHHNamingSettings(
+            '{!{!FirstName}} {!LastName}} Household',
+            '{!{!Title} {!FirstName}}}{!LastName}',
+            '{!{!FirstName}}}'
+        );
+    }
+
+    /*********************************************************************************************************
+    * @description Configures Household Naming Settings with valid Name and Greetings formats
+    * @return Household_Naming_Settings__c
+    **********************************************************************************************************/
+    public static Household_Naming_Settings__c setupHHNamingSettings() {
+        return setupHHNamingSettings(            
+            '{!{!FirstName} {!LastName}} Household',
+            '{!{!Title} {!FirstName}} {!LastName}',
+            '{!{!FirstName}}'
+        );
+    }
+
+    /*********************************************************************************************************
+    * @description Configures Household Naming Settings 
+    * @param hhNameFormat Household Naming Format
+    * @param formalGreetingFormat Formal Greeting Format
+    * @param informalGreetingFormat Informal Greeting Format
+    * @return Household_Naming_Settings__c
+    **********************************************************************************************************/
+    public static Household_Naming_Settings__c setupHHNamingSettings(String hhNameFormat, String formalGreetingFormat, String informalGreetingFormat) {
+        return UTIL_CustomSettingsFacade.getHouseholdNamingSettingsForTests(
+            new Household_Naming_Settings__c(
+                Household_Name_Format__c = hhNameFormat,
+                Formal_Greeting_Format__c = formalGreetingFormat,
+                Informal_Greeting_Format__c = informalGreetingFormat,
+                Name_Connector__c = label.npo02.HouseholdNameConnector,
+                Name_Overrun__c = label.npo02.HouseholdNameOverrun,
+                Contact_Overrun_Count__c = 9,
+                Implementing_Class__c = 'HH_NameSpec'
+            )
+        );
+    }
+
+    // =====================================================================================================
+    // Methods to disable blocks of TDTM trigger handlers to aid in staying within unit test governor limits
+    // =====================================================================================================
+
+    /* @description Disable all Affiliations related trigger handlers when not needed to improve performance */
+    public static void disableAffiliationsTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Contact', 'AFFL_Affiliations_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Account', 'AFFL_Affiliations_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('npe5__Affiliation__c', 'AFFL_Affiliations_TDTM', false);
+    }
+    /* @description Disable all Relationship related trigger handlers when not needed to improve performance */
+    public static void disableRelationshipTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('CampaignMember', 'REL_Relationships_Cm_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Contact', 'REL_Relationships_Con_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('npe4__Relationship__c', 'REL_Relationships_TDTM', false);
+    }
+    /* @description Disable all OppContactRole elated trigger handlers when not needed to improve performance */
+    public static void disableOCRTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'OPP_OpportunityContactRoles_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'HH_OppContactRoles_TDTM', false);
+    }
+    /* @description Disable all non-OCR related Opportunity trigger handlers when not needed to improve performance */
+    public static void disableOppNonOCRTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'MTCH_Opportunity_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'PSC_Opportunity_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'OPP_CampaignMember_TDTM', false);
+    }
+    /* @description Disable all OppRollup related trigger handlers when not needed to improve performance */
+    public static void disableRollupTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'RLLP_OppRollup_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Task', 'EP_TaskRollup_TDTM', false);
+    }
+    /* @description Disable all OppRollup related trigger handlers when not needed to improve performance */
+    public static void disableCustomizableRollupTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Opportunity', 'CRLP_Rollup_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('npe01__OppPayment__c', 'CRLP_Rollup_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Allocation__c', 'CRLP_Rollup_TDTM', false);
+    }
+    /* @description Disable all Account/Contact Merge related trigger handlers when not needed to improve performance */
+    public static void disableMergeTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Contact', 'CON_ContactMerge_TDTM', false);
+        TDTM_ProcessControl.toggleTriggerState('Account', 'ACCT_AccountMerge_TDTM', false);
+    }
+    /* @description Disable all HH Naming related trigger handlers and setting when not needed to improve performance */
+    public static void disableHHNamingTriggers() {
+        createDefaultTDTMHandlers();
+        TDTM_ProcessControl.toggleTriggerState('Contact', 'HH_Households_TDTM', false);
+        UTIL_UnitTestData_TEST.turnOffAutomaticHHNaming();
+    }
+
+    /*********************************************************************************************************
+    * @description Extracts Ids of sObjects
+    * @param sObjects List of sObjects
+    * @return Set<Id> Set of sObjects' Ids
+    **********************************************************************************************************/
+    public static Set<Id> extractIds(List<sObject> sObjects) {
+        return (new Map<Id, sObject>(sObjects)).keySet();
+    }
+
+    /*********************************************************************************************************
+    * @description Sets the Fixed Search Results to the Ids of the sObjects
+    * @param sObjects List of sObjects
+    **********************************************************************************************************/
+    public static void setFixedSearchResults(List<sObject> sObjects) {
+        Test.setFixedSearchResults(new List<Id>(extractIds(sObjects)));
+    }
+
+    /**
+     * @description Create the default trigger handler records if they haven't already been created
+     */
+    private static Boolean haveTriggerRecordsBeenCreated = false;
+    private static void createDefaultTDTMHandlers() {
+        if (!haveTriggerRecordsBeenCreated && TDTM_Config_API.getCachedRecords().size() == 0) {
+            insert TDTM_DefaultConfig.getDefaultRecords();
+            TDTM_ObjectDataGateway.ClearCachedTriggerHandlersForTest();
+            haveTriggerRecordsBeenCreated = true;
+        }
+    }
+
+    /**
+     * @description Returns True if the Account.Name is encrypted.
+     * It is mainly used in test methods with Individual Account model which is not supported when the Account.Name is encrypted.
+     */
+    public static Boolean isAccountNameEncrypted() {
+        return !Schema.sObjectType.Account.fields.Name.isFilterable();
+    }
+
+    /**
+    * @description Returns a currency that isn't the org default so we can test behavior for multicurrency orgs.
+    * To get the default currency code, use UTIL_CurrencyCache.getOrgDefaultCurrency()
+    */
+    @TestVisible
+    private static UTIL_CurrencyCache.CurrencyData nonDefaultCurrencyType {
+        get {
+            if (nonDefaultCurrencyType == null) {
+                // get a valid ISO code
+                List<SObject> nonDefaultCurrency = Database.query(
+                    'SELECT IsoCode FROM CurrencyType WHERE IsCorporate = false LIMIT 1'
+                );
+                if (nonDefaultCurrency.size() > 0) {
+                    String nonDefaultCurrencyCode = (String)nonDefaultCurrency[0].get('IsoCode');
+                    nonDefaultCurrencyType = UTIL_CurrencyCache.cachedMapOfRatesByCurrencyCode.get(nonDefaultCurrencyCode);
+                }
+            }
+            return nonDefaultCurrencyType;
+        }
+        set;
+    }
+
+    /*******************************************************************************************************************
+    * @description Ensures that mockIds() does not produce the same ID twice
+    */
+    private static Integer dummyIdCounter {
+        get {
+            if (dummyIdCounter == null) {
+                dummyIdCounter = 0;
+            }
+            dummyIdCounter++;
+            return dummyIdCounter;
+        }
+        set;
+    }
+
+    /*******************************************************************************************************************
+    * @description Generates a mock Id for an sObject
+    */
+    public static Id mockId(SObjectType sObjectType) {
+        return mockIds(sObjectType, 1)[0];
+    }
+
+    /*******************************************************************************************************************
+    * @description Generates mock Ids for an sObject
+    */
+    public static List<Id> mockIds(SObjectType sObjectType, Integer size) {
+        String keyPrefix = sObjectType.getDescribe().getKeyPrefix();
+        List<Id> ids = new List<Id>();
+
+        for (Integer i = 0; i < size; i++) {
+            Integer uniqueCounter = dummyIdCounter;
+            ids.add(keyPrefix + '0'.repeat(12 - String.valueOf(uniqueCounter).length()) + uniqueCounter);
+        }
+
+        return ids;
+    }
+
+    /*******************************************************************************************************************
+    * @description Sets mock Ids for a list of sObjects
+    */
+    public static void setMockIds(List<SObject> records) {
+        for (SObject record : records) {
+            record.Id = mockId(record.getSObjectType());
+        }
+    }
 }

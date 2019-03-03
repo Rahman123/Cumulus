@@ -1,0 +1,15 @@
+{
+  "orgName": "NPSP - Beta Org - MiddleSuffix",
+  "edition": "Developer",
+  "hasSampleData": "true",
+  "orgPreferences" : {
+    "enabled": [
+      "ChatterEnabled",
+      "DisableParallelApexTesting",
+      "IsMiddleNameEnabled",
+      "IsNameSuffixEnabled",
+      "NotesReservedPref01",
+      "S1DesktopEnabled"
+    ]
+  }
+}

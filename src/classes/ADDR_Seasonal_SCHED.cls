@@ -33,32 +33,15 @@
 * @group Address Management
 * @description Supports the automatic scheduling of Seasonal Address updates  
 */ 
-public class ADDR_Seasonal_SCHED implements Database.Batchable<SObject>, UTIL_MasterSchedulableHelper.UTIL_IRecurring {
+public class ADDR_Seasonal_SCHED implements Database.Batchable<SObject>, Schedulable {
+
+    private static final Integer BATCH_SIZE = 10;
 
     /*******************************************************************************************************
-    * @description holds the soql string that queries all Addresses in the current month and day
-    */
-    public String strQuery { get; set; }
-    
-    /*******************************************************************************************************
-    * @description executes the batch job
-    * @return boolean. true if the batch runs, false if the batch cannot run.  
+    * @description Schedulable execute method executes this batch job
     ********************************************************************************************************/
-    public Boolean executeReturnStatus() { 
-    	//call the batch job, processing 10 at a time
-        if(UTIL_JobScheduler.canRunBatch()) {
-	    	integer iMonth = system.today().month();
-	    	integer iDay = system.today().day();
-	        
-	        strQuery = 'select Id, Household_Account__c, Default_Address__c ' +
-	            ' from Address__c ' +
-	            ' where Seasonal_Start_Month__c = \'' + string.valueOf(iMonth) + '\'' +
-	            ' and Seasonal_Start_Day__c = \'' + string.valueOf(iDay) + '\'';
-        
-            Id batchInstanceId = Database.executeBatch(this, 10);
-            return true;
-        }
-        return false;
+    public void execute(SchedulableContext context) {
+        Database.executeBatch(new ADDR_Seasonal_SCHED(), BATCH_SIZE);
     }
 
     /*******************************************************************************************************
@@ -66,18 +49,29 @@ public class ADDR_Seasonal_SCHED implements Database.Batchable<SObject>, UTIL_Ma
     * @param bc the BatchableContext
     * @return database.Querylocator  
     ********************************************************************************************************/
-    public database.Querylocator start(Database.BatchableContext bc){       
-        return Database.getQueryLocator(strQuery);      
+    public Database.Querylocator start(Database.BatchableContext bc) {
+        final List<String> monthsList = new List<String>{ '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12' };
+
+        // Find all Accounts who have any Seasonal Address that might need updating,
+        // since it may need to now become current or inactive, and we don't want to assume the last time this ran.
+        // Make sure to include all Billing Address fields, that we will need to look at
+        String soql = 'SELECT Id, BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, BillingLongitude, BillingLatitude';
+        if (ADDR_Addresses_TDTM.isStateCountryPicklistsEnabled) {
+            soql += ', BillingStateCode, BillingCountryCode';
+        }
+        soql += ' FROM Account WHERE Id IN (SELECT Household_Account__c FROM Address__c ' +
+            ' WHERE Seasonal_Start_Month__c IN :monthsList)';
+        return Database.getQueryLocator(soql);
     }
-    
+
     /*******************************************************************************************************
     * @description execute Method for the Database.Batchable interface
     * @param bc the BatchableContext
-    * @param listSobj the list of Address objects to process
+    * @param scope the list of Account objects to process
     * @return void  
     ********************************************************************************************************/
-    public void execute(Database.BatchableContext bc, Sobject[] listSobj) {
-    	ADDR_Addresses_TDTM.batchSeasonalUpdate((list<Address__c>) listSobj);        
+    public void execute(Database.BatchableContext bc, List<Account> scope) {
+        ADDR_Addresses_TDTM.batchSeasonalUpdate(scope);
     }
 
     /*******************************************************************************************************

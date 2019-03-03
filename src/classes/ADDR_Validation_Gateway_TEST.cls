@@ -30,14 +30,11 @@
 /**
 * @author Salesforce.org
 * @date 2014
+* @group Address Management
 * @description Class that tests ADDR_SmartyStreets_Gateway class.
 */
 @isTest
 public with sharing class ADDR_Validation_Gateway_TEST {
-	
-	// if you only want to run one test in this class, fill in its name here.
-    // if you want to run all tests, then use '*'
-    private static string strTestOnly = '*';
 
     private static Addr_Verification_Settings__c settings;
     
@@ -59,7 +56,6 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
     
     public static testMethod void testOneAddress() {
-    	if (strTestOnly != '*' && strTestOnly != 'testOneAddress') return;
     	ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
         
         Test.startTest();
@@ -73,7 +69,6 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
 
     public static testMethod void testMultiAddress() {
-    	if (strTestOnly != '*' && strTestOnly != 'testMultiAddress') return;
     	ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
     	
         Test.startTest();
@@ -87,7 +82,6 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
 
     public static testMethod void testZip() {
-    	if (strTestOnly != '*' && strTestOnly != 'testZip') return;
     	ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
 
         Test.startTest();
@@ -101,8 +95,7 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
 
     public static testMethod void testBadInput() {
-        if (strTestOnly != '*' && strTestOnly != 'testBadInput') return;
-        ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();        
+        ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
         
         Test.startTest();
         ADDR_SmartyStreets_Gateway.AddressResponse sr;
@@ -117,8 +110,7 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
     
     public static testMethod void testBadAuth() {
-    	if (strTestOnly != '*' && strTestOnly != 'testBadAuth') return;
-    	ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();        
+    	ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
         
         Test.startTest();
         ADDR_SmartyStreets_Gateway.AddressResponse sr;
@@ -133,7 +125,6 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
     
     public static testMethod void testNoSubscription() {
-        if (strTestOnly != '*' && strTestOnly != 'testNoSubscription') return;
         ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
                 
         Test.startTest();
@@ -149,7 +140,6 @@ public with sharing class ADDR_Validation_Gateway_TEST {
     }
     
     public static testMethod void testServerError() {
-        if (strTestOnly != '*' && strTestOnly != 'testServerError') return;
         ADDR_SmartyStreets_Gateway gateway = createDefaultSettings();
                 
         Test.startTest();
